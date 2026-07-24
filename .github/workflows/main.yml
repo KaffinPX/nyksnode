@@ -1,0 +1,56 @@
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+name: Rust
+
+jobs:
+  runner-matrix:
+    name: format, lint, test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Run cargo fmt
+        run: cargo fmt --all -- --check
+
+      - name: Build documentation
+        run: cargo doc --no-deps --workspace --document-private-items
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+      - name: Run clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Build benches
+        run: cargo build --benches
+
+      - name: Run tests without benches
+        run: >
+          cargo test
+          --lib --bins --tests --examples
+          --
+          --skip mine_20_blocks_in_40_seconds
+          --skip hash_rate_independent_of_tx_size
+          --skip blocks_with_0_to_10_inputs_and_successors_are_valid
+          --skip can_cancel_preprocess_within_one_second
+          --skip can_cancel_merkle_tree_construction_within_two_seconds
+          --skip alice_updates_mutator_set_data_on_own_transaction
+
+        # `--doc` cannot be mixed with other target option
+      - name: Run documentation tests
+        run: cargo test --doc

@@ -1,0 +1,27 @@
+[package]
+name = "nyks-upgrader"
+description = "architect of nyks transactions"
+authors = ["Nyksdevs"]
+version = "0.8.0"
+edition = "2024"
+license = "Apache-2.0"
+
+repository = "https://github.com/Nyksnet/nyksnode/"
+
+[dependencies]
+nyks-protocol = { version = "0.8.0", path = "../protocol" }
+nyks-prover = { version = "0.8.0", path = "../prover" }
+nyks-rpc-client = { version = "0.8.0", path = "../rpc/client" }
+nyks-standards = { version = "0.8.0", path = "../standards" }
+nyks-wallet-core = { version = "0.8.0", path = "../wallet/core" }
+anyhow = "1.0.98"
+tokio = { version = "1.45.1", features = ["full", "tracing"] }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+clap = { version = "4.5.54", features = ["derive"] }
+itertools = "0.14"
+
+[dev-dependencies]
+
+[lints]
+workspace = true

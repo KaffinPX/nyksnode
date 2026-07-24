@@ -1,0 +1,34 @@
+[package]
+name = "nyks-locks"
+description = "Simplified, instrumented read-write lock types used by nyks-node."
+authors = ["Triton Software"]
+
+version = "0.8.0"
+edition = "2021"
+license = "Apache-2.0"
+
+homepage = "https://neptune.cash/"
+repository = "https://github.com/Neptune-Crypto/neptune-core/"
+
+[features]
+# locks::tokio support for tracking the location of lock acquisition.
+# requires nightly. not generally useful by itself.
+track-lock-location = []
+
+# locks::tokio support for tracking the instant of lock acquisition.
+# not generally useful by itself.
+track-lock-time = []
+
+[dependencies]
+futures = "0.3"
+tokio = { version = "1.47", features = ["sync", "macros", "rt", "time"] }
+
+[dev-dependencies]
+macro_rules_attr = "0.1.3"
+tokio = { version = "1.47", features = ["rt-multi-thread"] }
+tokio-test = "0.4"
+tracing = "0.1"
+tracing-test = "0.2"
+
+[lints]
+workspace = true

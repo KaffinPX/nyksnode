@@ -1,0 +1,195 @@
+use serde::Deserialize;
+use serde::Serialize;
+use tasm_lib::prelude::Digest;
+
+use crate::model::block::transaction_kernel::RpcTransactionKernel;
+use crate::model::common::RpcBFieldElements;
+use nyks_protocol::consensus::transaction::Transaction;
+use nyks_protocol::consensus::transaction::TransactionProof;
+use nyks_protocol::consensus::transaction::utxo::Coin;
+use nyks_protocol::consensus::transaction::utxo::Utxo;
+use nyks_protocol::consensus::transaction::validity::neptune_proof::NeptuneProof;
+use nyks_protocol::consensus::transaction::validity::proof_collection::ProofCollection;
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RpcNeptuneProof(RpcBFieldElements);
+
+impl From<NeptuneProof> for RpcNeptuneProof {
+    fn from(proof: NeptuneProof) -> Self {
+        Self(proof.0.clone().into())
+    }
+}
+
+impl From<RpcNeptuneProof> for NeptuneProof {
+    fn from(proof: RpcNeptuneProof) -> NeptuneProof {
+        proof.0.0.into()
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RpcProofCollection {
+    pub removal_records_integrity: RpcNeptuneProof,
+    pub collect_lock_scripts: RpcNeptuneProof,
+    pub lock_scripts_halt: Vec<RpcNeptuneProof>,
+    pub kernel_to_outputs: RpcNeptuneProof,
+    pub collect_type_scripts: RpcNeptuneProof,
+    pub type_scripts_halt: Vec<RpcNeptuneProof>,
+    pub lock_script_hashes: Vec<Digest>,
+    pub type_script_hashes: Vec<Digest>,
+    pub kernel_mast_hash: Digest,
+    pub salted_inputs_hash: Digest,
+    pub salted_outputs_hash: Digest,
+    pub merge_bit_mast_path: Vec<Digest>,
+}
+
+impl From<RpcProofCollection> for ProofCollection {
+    fn from(pc: RpcProofCollection) -> Self {
+        Self {
+            removal_records_integrity: pc.removal_records_integrity.into(),
+            collect_lock_scripts: pc.collect_lock_scripts.into(),
+            lock_scripts_halt: pc.lock_scripts_halt.into_iter().map(Into::into).collect(),
+            kernel_to_outputs: pc.kernel_to_outputs.into(),
+            collect_type_scripts: pc.collect_type_scripts.into(),
+            type_scripts_halt: pc.type_scripts_halt.into_iter().map(Into::into).collect(),
+            lock_script_hashes: pc.lock_script_hashes,
+            type_script_hashes: pc.type_script_hashes,
+            kernel_mast_hash: pc.kernel_mast_hash,
+            salted_inputs_hash: pc.salted_inputs_hash,
+            salted_outputs_hash: pc.salted_outputs_hash,
+            merge_bit_mast_path: pc.merge_bit_mast_path,
+        }
+    }
+}
+
+impl From<ProofCollection> for RpcProofCollection {
+    fn from(pc: ProofCollection) -> Self {
+        Self {
+            removal_records_integrity: pc.removal_records_integrity.into(),
+            collect_lock_scripts: pc.collect_lock_scripts.into(),
+            lock_scripts_halt: pc.lock_scripts_halt.into_iter().map(Into::into).collect(),
+            kernel_to_outputs: pc.kernel_to_outputs.into(),
+            collect_type_scripts: pc.collect_type_scripts.into(),
+            type_scripts_halt: pc.type_scripts_halt.into_iter().map(Into::into).collect(),
+            lock_script_hashes: pc.lock_script_hashes,
+            type_script_hashes: pc.type_script_hashes,
+            kernel_mast_hash: pc.kernel_mast_hash,
+            salted_inputs_hash: pc.salted_inputs_hash,
+            salted_outputs_hash: pc.salted_outputs_hash,
+            merge_bit_mast_path: pc.merge_bit_mast_path,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum RpcTransactionProof {
+    ProofCollection(Box<RpcProofCollection>),
+    SingleProof(RpcNeptuneProof),
+}
+
+impl From<RpcTransactionProof> for TransactionProof {
+    fn from(proof: RpcTransactionProof) -> TransactionProof {
+        match proof {
+            RpcTransactionProof::ProofCollection(pc) => {
+                TransactionProof::ProofCollection((*pc).into())
+            }
+            RpcTransactionProof::SingleProof(sp) => TransactionProof::SingleProof(sp.into()),
+        }
+    }
+}
+
+impl From<TransactionProof> for RpcTransactionProof {
+    fn from(value: TransactionProof) -> RpcTransactionProof {
+        match value {
+            TransactionProof::SingleProof(sp) => RpcTransactionProof::SingleProof(sp.into()),
+            TransactionProof::ProofCollection(pc) => {
+                RpcTransactionProof::ProofCollection(Box::new(pc.into()))
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RpcTransaction {
+    pub kernel: RpcTransactionKernel,
+    pub proof: RpcTransactionProof,
+}
+
+impl From<RpcTransaction> for Transaction {
+    fn from(tx: RpcTransaction) -> Self {
+        Transaction {
+            kernel: tx.kernel.into(),
+            proof: tx.proof.into(),
+        }
+    }
+}
+
+impl From<Transaction> for RpcTransaction {
+    fn from(value: Transaction) -> Self {
+        Self {
+            kernel: RpcTransactionKernel::from(&value.kernel),
+            proof: value.proof.into(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RpcCoin {
+    pub type_script_hash: Digest,
+    pub state: RpcBFieldElements,
+}
+
+impl From<Coin> for RpcCoin {
+    fn from(value: Coin) -> Self {
+        Self {
+            type_script_hash: value.type_script_hash,
+            state: value.state.into(),
+        }
+    }
+}
+
+impl From<&Coin> for RpcCoin {
+    fn from(value: &Coin) -> Self {
+        Self {
+            type_script_hash: value.type_script_hash,
+            state: value.state.to_owned().into(),
+        }
+    }
+}
+
+impl From<RpcCoin> for Coin {
+    fn from(value: RpcCoin) -> Self {
+        Self {
+            type_script_hash: value.type_script_hash,
+            state: value.state.into(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RpcUtxo {
+    lock_script_hash: Digest,
+    coins: Vec<RpcCoin>,
+}
+
+impl From<Utxo> for RpcUtxo {
+    fn from(value: Utxo) -> Self {
+        Self {
+            lock_script_hash: value.lock_script_hash(),
+            coins: value.coins().iter().map(|x| x.into()).collect(),
+        }
+    }
+}
+
+impl From<RpcUtxo> for Utxo {
+    fn from(value: RpcUtxo) -> Self {
+        Self::new(
+            value.lock_script_hash,
+            value.coins.into_iter().map(|x| x.into()).collect(),
+        )
+    }
+}

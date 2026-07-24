@@ -1,0 +1,9 @@
+[target.wasm32-unknown-unknown]
+rustflags = [
+  "-C", "target-feature=+atomics,+bulk-memory",
+  "-C", "link-args=-z stack-size=134217728",
+  "-C", "link-args=--max-memory=4294967296",
+]
+
+[unstable]
+build-std = ["panic_abort", "std"]

@@ -1,0 +1,19 @@
+[package]
+name = "nyks-rpc-macros"
+description = "Macros for nyks RPC"
+version = "0.8.0"
+edition = "2024"
+license = "Apache-2.0"
+
+repository = "https://github.com/Nyksnet/nyksnode/"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+convert_case = "0.8.0"
+quote = "1.0.40"
+syn = { version = "2.0.106", features = ["full"] }
+
+[lints]
+workspace = true

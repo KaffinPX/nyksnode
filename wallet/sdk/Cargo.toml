@@ -1,0 +1,26 @@
+[package]
+name = "nyks-wallet-sdk"
+description = "wallet sdk of nyks"
+authors = ["Nyksdevs"]
+version = "0.8.0"
+edition = "2024"
+license = "Apache-2.0"
+
+repository = "https://github.com/Nyksnet/nyksnode/"
+
+[dependencies]
+nyks-protocol = { version = "0.8.0", path = "../../protocol" }
+nyks-standards = { version = "0.8.0", path = "../../standards" }
+nyks-wallet-core = { version = "0.8.0", path = "../core" }
+nyks-rpc-client = { version = "0.8.0", path = "../../rpc/client" }
+tracing = "0.1.41"
+num-traits = "0.2.19"
+serde = "1.0.228"
+thiserror = "1.0.65"
+zeroize = "1.8.1"
+tokio = { version = "1.45.1", features = ["sync"] }
+
+[dev-dependencies]
+
+[lints]
+workspace = true

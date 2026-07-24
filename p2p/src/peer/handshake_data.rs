@@ -1,0 +1,173 @@
+use std::fmt::Display;
+use std::ops::Deref;
+use std::time::Duration;
+use std::time::SystemTime;
+
+use arraystring::ArrayString;
+use arraystring::typenum::U30;
+use arraystring::typenum::U255;
+use nyks_protocol::consensus::block::block_header::BlockHeader;
+use nyks_protocol::consensus::network::Network;
+use serde::Deserialize;
+use serde::Serialize;
+
+// TODO: move to a constants file
+/// Only accept connections where peer's reported timestamp deviates from our
+/// by less than this value.
+const PEER_TIME_DIFFERENCE_THRESHOLD_IN_SECONDS: u128 = 90;
+pub const PEER_TIME_DIFFERENCE_THRESHOLD: Duration =
+    Duration::from_secs(PEER_TIME_DIFFERENCE_THRESHOLD_IN_SECONDS as u64);
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct VersionString(ArrayString<U30>);
+
+impl Deref for VersionString {
+    type Target = ArrayString<U30>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Display for VersionString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl VersionString {
+    pub fn new_from_str(s: &str) -> Self {
+        let array_string = ArrayString::<U30>::from_chars(s.chars());
+        Self(array_string)
+    }
+
+    pub fn versions_are_compatible(own: Self, other: Self) -> bool {
+        let own = semver::Version::parse(&own)
+            .unwrap_or_else(|_| panic!("Must be able to parse own version string. Got: {own}"));
+        let Ok(other) = semver::Version::parse(&other) else {
+            return false;
+        };
+
+        // All alphanet and betanet versions are incompatible with each other.
+        // Alpha and betanet have versions "0.0.n". Alpha and betanet are
+        // incompatible with all other versions.
+        if own.major == 0 && own.minor == 0 || other.major == 0 && other.minor == 0 {
+            return own == other;
+        }
+
+        // Cannot connect two different versions on either side of 0.5.
+        if own.major == 0 && other.major == 0 {
+            let own_is_less = own.minor <= 5;
+            let other_is_more = other.minor > 5;
+            if own_is_less && other_is_more {
+                return false;
+            }
+
+            let own_is_more = own.minor > 5;
+            let other_is_less = other.minor <= 5;
+            if own_is_more && other_is_less {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+pub type ExtraDataString = ArrayString<U255>;
+
+/// Datastruct defining the handshake peers exchange when establishing a new
+/// connection.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct HandshakeData {
+    pub tip_header: BlockHeader,
+    pub listen_port: Option<u16>,
+    pub network: Network,
+    pub instance_id: u128,
+    pub version: VersionString,
+    pub is_archival_node: bool,
+
+    /// Indicates whether node acts as a bootstrapping node in a network
+    /// context.
+    pub is_bootstrapper_node: bool,
+
+    /// Client's timestamp when the handshake was generated. Can be used to
+    /// compare own timestamp to peer's or to a list of peers.
+    pub timestamp: SystemTime,
+
+    /// Use this field to add extra data in a backwards compatible manner. An
+    /// encoding should be selected for this. Currently unused.
+    pub extra_data: ExtraDataString,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, thiserror::Error)]
+pub enum HandshakeValidationError {
+    #[error("connect to self")]
+    SelfConnect,
+
+    #[error("local network ({local}) =/= remote network {remote}")]
+    NetworkMismatch { local: Network, remote: Network },
+
+    #[error("local version ({local}) is incompatible with remote version ({remote})")]
+    IncompatibleVersion {
+        local: VersionString,
+        remote: VersionString,
+    },
+
+    #[error("clock difference between local and remote too large")]
+    ExcessiveClockDifference {
+        local: SystemTime,
+        remote: SystemTime,
+    },
+}
+
+impl HandshakeData {
+    /// Determine whether two handshakes are compatible.
+    pub fn validate(
+        local_handshake: &HandshakeData,
+        remote_handshake: &HandshakeData,
+    ) -> Result<(), HandshakeValidationError> {
+        // Instance ID
+        if local_handshake.instance_id == remote_handshake.instance_id {
+            return Err(HandshakeValidationError::SelfConnect);
+        }
+
+        // Network
+        if local_handshake.network != remote_handshake.network {
+            return Err(HandshakeValidationError::NetworkMismatch {
+                local: local_handshake.network,
+                remote: remote_handshake.network,
+            });
+        }
+
+        // Versions
+        if !VersionString::versions_are_compatible(
+            local_handshake.version,
+            remote_handshake.version,
+        ) {
+            return Err(HandshakeValidationError::IncompatibleVersion {
+                local: local_handshake.version,
+                remote: remote_handshake.version,
+            });
+        }
+
+        // Time difference
+        let lag = remote_handshake
+            .timestamp
+            .duration_since(local_handshake.timestamp)
+            .ok();
+        let front = local_handshake
+            .timestamp
+            .duration_since(remote_handshake.timestamp)
+            .ok();
+        let absolute_time_delta = lag.unwrap_or_else(|| front.unwrap());
+        if absolute_time_delta > PEER_TIME_DIFFERENCE_THRESHOLD {
+            return Err(HandshakeValidationError::ExcessiveClockDifference {
+                local: local_handshake.timestamp,
+                remote: remote_handshake.timestamp,
+            });
+        }
+
+        Ok(())
+    }
+}

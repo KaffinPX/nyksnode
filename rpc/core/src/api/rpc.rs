@@ -1,0 +1,576 @@
+use async_trait::async_trait;
+use nyks_standards::wallet::notes::announcement_flag::AnnouncementFlag;
+use serde::Deserialize;
+use serde::Serialize;
+use tasm_lib::prelude::Digest;
+use tasm_lib::triton_vm::prelude::BFieldElement;
+use thiserror::Error;
+
+use crate::model::block::RpcBlock;
+use crate::model::block::header::RpcBlockHeight;
+use crate::model::block::header::RpcBlockPow;
+use crate::model::block::transaction_kernel::RpcAbsoluteIndexSet;
+use crate::model::block::transaction_kernel::RpcAdditionRecord;
+use crate::model::block::transaction_kernel::RpcTransactionKernelId;
+use crate::model::common::RpcBlockSelector;
+use crate::model::json::JsonError;
+use crate::model::message::*;
+use crate::model::wallet::transaction::RpcTransaction;
+
+#[derive(Debug, Clone, Copy, Error, Eq, PartialEq, Serialize, Deserialize)]
+pub enum RestoreMembershipProofError {
+    #[error("Failed for index {0}")]
+    Failed(usize),
+
+    #[error("Exceeds the allowed limit")]
+    ExceedsAllowed,
+}
+
+#[derive(Debug, Clone, Copy, Error, Eq, PartialEq, Serialize, Deserialize)]
+pub enum SubmitTransactionError {
+    #[error("Invalid transaction")]
+    InvalidTransaction,
+
+    #[error("Coinbase transactions are not allowed")]
+    CoinbaseTransaction,
+
+    #[error("Transaction fee is negative")]
+    FeeNegative,
+
+    #[error("Transaction is future-dated")]
+    FutureDated,
+
+    #[error("Transaction not confirmable relative to the mutator set")]
+    NotConfirmable,
+}
+
+#[derive(Debug, Clone, Copy, Error, Eq, PartialEq, Serialize, Deserialize)]
+pub enum SubmitBlockError {
+    #[error("Invalid block")]
+    InvalidBlock,
+
+    #[error("The block's proof-of-work does not meet the required target")]
+    InsufficientWork,
+}
+
+#[derive(Debug, Clone, Error, Eq, PartialEq, Serialize, Deserialize)]
+pub enum RpcError {
+    #[error("JSON-RPC server error: {0}")]
+    Server(JsonError),
+
+    // Call-specific errors
+    #[error("Failed to restore membership proof: {0}")]
+    RestoreMembershipProof(RestoreMembershipProofError),
+
+    #[error("Failed to submit transaction: {0}")]
+    SubmitTransaction(SubmitTransactionError),
+
+    #[error("Failed to submit block: {0}")]
+    SubmitBlock(SubmitBlockError),
+
+    #[error("Filtering conditions may not be empty")]
+    EmptyFilteringConditions,
+
+    // Common case errors
+    #[error("Invalid address provided in arguments")]
+    InvalidAddress,
+
+    #[error("Invalid multiaddr provided in arguments")]
+    InvalidMultiaddr,
+
+    #[error("Access to this endpoint is restricted")]
+    RestrictedAccess,
+}
+
+pub type RpcResult<T> = Result<T, RpcError>;
+
+#[async_trait]
+pub trait RpcApi: Sync + Send {
+    /* Node */
+
+    async fn network(&self) -> RpcResult<NetworkResponse> {
+        self.network_call(NetworkRequest {}).await
+    }
+    async fn network_call(&self, request: NetworkRequest) -> RpcResult<NetworkResponse>;
+
+    /* Chain */
+
+    async fn height(&self) -> RpcResult<HeightResponse> {
+        self.height_call(HeightRequest {}).await
+    }
+    async fn height_call(&self, request: HeightRequest) -> RpcResult<HeightResponse>;
+
+    async fn tip_digest(&self) -> RpcResult<TipDigestResponse> {
+        self.tip_digest_call(TipDigestRequest {}).await
+    }
+    async fn tip_digest_call(&self, request: TipDigestRequest) -> RpcResult<TipDigestResponse>;
+
+    async fn tip(&self) -> RpcResult<TipResponse> {
+        self.tip_call(TipRequest {}).await
+    }
+    async fn tip_call(&self, request: TipRequest) -> RpcResult<TipResponse>;
+
+    async fn tip_proof(&self) -> RpcResult<TipProofResponse> {
+        self.tip_proof_call(TipProofRequest {}).await
+    }
+    async fn tip_proof_call(&self, request: TipProofRequest) -> RpcResult<TipProofResponse>;
+
+    async fn tip_kernel(&self) -> RpcResult<TipKernelResponse> {
+        self.tip_kernel_call(TipKernelRequest {}).await
+    }
+    async fn tip_kernel_call(&self, request: TipKernelRequest) -> RpcResult<TipKernelResponse>;
+
+    async fn tip_header(&self) -> RpcResult<TipHeaderResponse> {
+        self.tip_header_call(TipHeaderRequest {}).await
+    }
+    async fn tip_header_call(&self, request: TipHeaderRequest) -> RpcResult<TipHeaderResponse>;
+
+    async fn tip_body(&self) -> RpcResult<TipBodyResponse> {
+        self.tip_body_call(TipBodyRequest {}).await
+    }
+    async fn tip_body_call(&self, request: TipBodyRequest) -> RpcResult<TipBodyResponse>;
+
+    async fn tip_transaction_kernel(&self) -> RpcResult<TipTransactionKernelResponse> {
+        self.tip_transaction_kernel_call(TipTransactionKernelRequest {})
+            .await
+    }
+    async fn tip_transaction_kernel_call(
+        &self,
+        request: TipTransactionKernelRequest,
+    ) -> RpcResult<TipTransactionKernelResponse>;
+
+    async fn tip_announcements(&self) -> RpcResult<TipAnnouncementsResponse> {
+        self.tip_announcements_call(TipAnnouncementsRequest {})
+            .await
+    }
+    async fn tip_announcements_call(
+        &self,
+        request: TipAnnouncementsRequest,
+    ) -> RpcResult<TipAnnouncementsResponse>;
+
+    /* Archival */
+
+    async fn get_block_digests(&self, height: BFieldElement) -> RpcResult<GetBlockDigestsResponse> {
+        self.get_block_digests_call(GetBlockDigestsRequest { height })
+            .await
+    }
+    async fn get_block_digests_call(
+        &self,
+        request: GetBlockDigestsRequest,
+    ) -> RpcResult<GetBlockDigestsResponse>;
+
+    async fn get_block_digest(
+        &self,
+        selector: RpcBlockSelector,
+    ) -> RpcResult<GetBlockDigestResponse> {
+        self.get_block_digest_call(GetBlockDigestRequest { selector })
+            .await
+    }
+    async fn get_block_digest_call(
+        &self,
+        request: GetBlockDigestRequest,
+    ) -> RpcResult<GetBlockDigestResponse>;
+
+    async fn get_block(&self, selector: RpcBlockSelector) -> RpcResult<GetBlockResponse> {
+        self.get_block_call(GetBlockRequest { selector }).await
+    }
+    async fn get_block_call(&self, request: GetBlockRequest) -> RpcResult<GetBlockResponse>;
+
+    async fn get_block_proof(
+        &self,
+        selector: RpcBlockSelector,
+    ) -> RpcResult<GetBlockProofResponse> {
+        self.get_block_proof_call(GetBlockProofRequest { selector })
+            .await
+    }
+    async fn get_block_proof_call(
+        &self,
+        request: GetBlockProofRequest,
+    ) -> RpcResult<GetBlockProofResponse>;
+
+    async fn get_block_kernel(
+        &self,
+        selector: RpcBlockSelector,
+    ) -> RpcResult<GetBlockKernelResponse> {
+        self.get_block_kernel_call(GetBlockKernelRequest { selector })
+            .await
+    }
+    async fn get_block_kernel_call(
+        &self,
+        request: GetBlockKernelRequest,
+    ) -> RpcResult<GetBlockKernelResponse>;
+
+    async fn get_block_header(
+        &self,
+        selector: RpcBlockSelector,
+    ) -> RpcResult<GetBlockHeaderResponse> {
+        self.get_block_header_call(GetBlockHeaderRequest { selector })
+            .await
+    }
+    async fn get_block_header_call(
+        &self,
+        request: GetBlockHeaderRequest,
+    ) -> RpcResult<GetBlockHeaderResponse>;
+
+    async fn get_block_body(&self, selector: RpcBlockSelector) -> RpcResult<GetBlockBodyResponse> {
+        self.get_block_body_call(GetBlockBodyRequest { selector })
+            .await
+    }
+    async fn get_block_body_call(
+        &self,
+        request: GetBlockBodyRequest,
+    ) -> RpcResult<GetBlockBodyResponse>;
+
+    async fn get_block_transaction_kernel(
+        &self,
+        selector: RpcBlockSelector,
+    ) -> RpcResult<GetBlockTransactionKernelResponse> {
+        self.get_block_transaction_kernel_call(GetBlockTransactionKernelRequest { selector })
+            .await
+    }
+    async fn get_block_transaction_kernel_call(
+        &self,
+        request: GetBlockTransactionKernelRequest,
+    ) -> RpcResult<GetBlockTransactionKernelResponse>;
+
+    async fn get_block_announcements(
+        &self,
+        selector: RpcBlockSelector,
+    ) -> RpcResult<GetBlockAnnouncementsResponse> {
+        self.get_block_announcements_call(GetBlockAnnouncementsRequest { selector })
+            .await
+    }
+    async fn get_block_announcements_call(
+        &self,
+        request: GetBlockAnnouncementsRequest,
+    ) -> RpcResult<GetBlockAnnouncementsResponse>;
+
+    async fn is_block_canonical(&self, digest: Digest) -> RpcResult<IsBlockCanonicalResponse> {
+        self.is_block_canonical_call(IsBlockCanonicalRequest { digest })
+            .await
+    }
+    async fn is_block_canonical_call(
+        &self,
+        request: IsBlockCanonicalRequest,
+    ) -> RpcResult<IsBlockCanonicalResponse>;
+
+    async fn get_utxo_digest(&self, leaf_index: u64) -> RpcResult<GetUtxoDigestResponse> {
+        self.get_utxo_digest_call(GetUtxoDigestRequest { leaf_index })
+            .await
+    }
+    async fn get_utxo_digest_call(
+        &self,
+        request: GetUtxoDigestRequest,
+    ) -> RpcResult<GetUtxoDigestResponse>;
+
+    async fn find_utxo_origin(
+        &self,
+        addition_record: RpcAdditionRecord,
+        search_depth: Option<u64>,
+    ) -> RpcResult<FindUtxoOriginResponse> {
+        self.find_utxo_origin_call(FindUtxoOriginRequest {
+            addition_record,
+            search_depth,
+        })
+        .await
+    }
+    async fn find_utxo_origin_call(
+        &self,
+        request: FindUtxoOriginRequest,
+    ) -> RpcResult<FindUtxoOriginResponse>;
+
+    /// Check if indices in an absolute index set are set in the node's archival
+    /// mutator set. Can be used to check  if a UTXO is spent without having to
+    /// know the mutator set membership proof.
+    async fn are_bloom_indices_set(
+        &self,
+        absolute_index_set: RpcAbsoluteIndexSet,
+    ) -> RpcResult<AreBloomIndicesSetResponse> {
+        self.are_bloom_indices_set_call(AreBloomIndicesSetRequest { absolute_index_set })
+            .await
+    }
+
+    async fn are_bloom_indices_set_call(
+        &self,
+        request: AreBloomIndicesSetRequest,
+    ) -> RpcResult<AreBloomIndicesSetResponse>;
+
+    /* Wallet */
+
+    /// Return all blocks in the specified range (inclusive). Will not return
+    /// the genesis block.
+    async fn get_blocks(
+        &self,
+        from_height: RpcBlockHeight,
+        to_height: RpcBlockHeight,
+    ) -> RpcResult<GetBlocksResponse> {
+        self.get_blocks_call(GetBlocksRequest {
+            from_height,
+            to_height,
+        })
+        .await
+    }
+    async fn get_blocks_call(&self, request: GetBlocksRequest) -> RpcResult<GetBlocksResponse>;
+
+    async fn restore_membership_proof(
+        &self,
+        absolute_index_sets: Vec<RpcAbsoluteIndexSet>,
+    ) -> RpcResult<RestoreMembershipProofResponse> {
+        self.restore_membership_proof_call(RestoreMembershipProofRequest {
+            absolute_index_sets,
+        })
+        .await
+    }
+    async fn restore_membership_proof_call(
+        &self,
+        request: RestoreMembershipProofRequest,
+    ) -> RpcResult<RestoreMembershipProofResponse>;
+
+    async fn submit_transaction(
+        &self,
+        transaction: RpcTransaction,
+    ) -> RpcResult<SubmitTransactionResponse> {
+        self.submit_transaction_call(SubmitTransactionRequest { transaction })
+            .await
+    }
+    async fn submit_transaction_call(
+        &self,
+        request: SubmitTransactionRequest,
+    ) -> RpcResult<SubmitTransactionResponse>;
+
+    /* Mining */
+
+    async fn submit_block_template(
+        &self,
+        block: RpcBlock,
+    ) -> RpcResult<SubmitBlockTemplateResponse> {
+        self.submit_block_template_call(SubmitBlockTemplateRequest { block })
+            .await
+    }
+    async fn submit_block_template_call(
+        &self,
+        request: SubmitBlockTemplateRequest,
+    ) -> RpcResult<SubmitBlockTemplateResponse>;
+
+    async fn get_block_template(
+        &self,
+        guesser_address: Option<String>,
+    ) -> RpcResult<GetBlockTemplateResponse> {
+        self.get_block_template_call(GetBlockTemplateRequest { guesser_address })
+            .await
+    }
+    async fn get_block_template_call(
+        &self,
+        request: GetBlockTemplateRequest,
+    ) -> RpcResult<GetBlockTemplateResponse>;
+
+    async fn submit_block(
+        &self,
+        template: RpcBlock,
+        pow: RpcBlockPow,
+    ) -> RpcResult<SubmitBlockResponse> {
+        self.submit_block_call(SubmitBlockRequest { template, pow })
+            .await
+    }
+    async fn submit_block_call(
+        &self,
+        request: SubmitBlockRequest,
+    ) -> RpcResult<SubmitBlockResponse>;
+
+    /* Utxoindex */
+
+    /// Return block heights for blocks containing announcements with specified
+    /// announcement flags. May return results from orphaned blocks.
+    async fn block_heights_by_flags(
+        &self,
+        announcement_flags: Vec<AnnouncementFlag>,
+    ) -> RpcResult<BlockHeightsByFlagsResponse> {
+        self.block_heights_by_flags_call(BlockHeightsByFlagsRequest { announcement_flags })
+            .await
+    }
+
+    async fn block_heights_by_flags_call(
+        &self,
+        request: BlockHeightsByFlagsRequest,
+    ) -> RpcResult<BlockHeightsByFlagsResponse>;
+
+    /// Return block heights for blocks containing specified addition records.
+    /// Returned block heights are guaranteed to reference blocks belonging to
+    /// the canonical chain.
+    async fn block_heights_by_addition_records(
+        &self,
+        addition_records: Vec<RpcAdditionRecord>,
+    ) -> RpcResult<BlockHeightsByAdditionRecordsResponse> {
+        self.block_heights_by_addition_records_call(BlockHeightsByAdditionRecordsRequest {
+            addition_records,
+        })
+        .await
+    }
+
+    async fn block_heights_by_addition_records_call(
+        &self,
+        request: BlockHeightsByAdditionRecordsRequest,
+    ) -> RpcResult<BlockHeightsByAdditionRecordsResponse>;
+
+    async fn block_heights_by_absolute_index_sets(
+        &self,
+        absolute_index_sets: Vec<RpcAbsoluteIndexSet>,
+    ) -> RpcResult<BlockHeightsByAbsoluteIndexSetsResponse> {
+        self.block_heights_by_absolute_index_sets_call(BlockHeightsByAbsoluteIndexSetsRequest {
+            absolute_index_sets,
+        })
+        .await
+    }
+
+    /// Return block heights for blocks containing specified absolute index
+    /// sets. Returned block heights are guaranteed to reference blocks
+    /// belonging to the canonical chain.
+    async fn block_heights_by_absolute_index_sets_call(
+        &self,
+        request: BlockHeightsByAbsoluteIndexSetsRequest,
+    ) -> RpcResult<BlockHeightsByAbsoluteIndexSetsResponse>;
+
+    /// Return the block heights for blocks matching *all* elements in the
+    /// specified input/output lists, for blocks belonging to the canonical
+    /// chain. Will not return block heights were e.g. only one of the outputs
+    /// was included if more than one output is included in the outputs list.
+    ///
+    /// Can return multiple blocks in the case where blocks are selected only
+    /// based on addition records and multiple blocks contain the same addition
+    /// records.
+    ///
+    /// Returns an error if no filtering conditions are set.
+    async fn was_mined(
+        &self,
+        inputs: Vec<RpcAbsoluteIndexSet>,
+        outputs: Vec<RpcAdditionRecord>,
+    ) -> RpcResult<WasMinedResponse> {
+        self.was_mined_call(WasMinedRequest {
+            absolute_index_sets: inputs,
+            addition_records: outputs,
+        })
+        .await
+    }
+
+    async fn was_mined_call(&self, request: WasMinedRequest) -> RpcResult<WasMinedResponse>;
+
+    /* Mempool */
+
+    async fn transactions(&self) -> RpcResult<TransactionsResponse> {
+        self.transactions_call(TransactionsRequest {}).await
+    }
+    async fn transactions_call(
+        &self,
+        request: TransactionsRequest,
+    ) -> RpcResult<TransactionsResponse>;
+
+    async fn get_transaction(
+        &self,
+        id: RpcTransactionKernelId,
+    ) -> RpcResult<GetTransactionResponse> {
+        self.get_transaction_call(GetTransactionRequest { id })
+            .await
+    }
+    async fn get_transaction_call(
+        &self,
+        request: GetTransactionRequest,
+    ) -> RpcResult<GetTransactionResponse>;
+
+    async fn get_transaction_kernel(
+        &self,
+        id: RpcTransactionKernelId,
+    ) -> RpcResult<GetTransactionKernelResponse> {
+        self.get_transaction_kernel_call(GetTransactionKernelRequest { id })
+            .await
+    }
+    async fn get_transaction_kernel_call(
+        &self,
+        request: GetTransactionKernelRequest,
+    ) -> RpcResult<GetTransactionKernelResponse>;
+
+    async fn get_transaction_proof(
+        &self,
+        id: RpcTransactionKernelId,
+    ) -> RpcResult<GetTransactionProofResponse> {
+        self.get_transaction_proof_call(GetTransactionProofRequest { id })
+            .await
+    }
+    async fn get_transaction_proof_call(
+        &self,
+        request: GetTransactionProofRequest,
+    ) -> RpcResult<GetTransactionProofResponse>;
+
+    async fn get_transactions_by_addition_records(
+        &self,
+        addition_records: Vec<RpcAdditionRecord>,
+    ) -> RpcResult<GetTransactionsByAdditionRecordsResponse> {
+        self.get_transactions_by_addition_records_call(GetTransactionsByAdditionRecordsRequest {
+            addition_records,
+        })
+        .await
+    }
+    async fn get_transactions_by_addition_records_call(
+        &self,
+        request: GetTransactionsByAdditionRecordsRequest,
+    ) -> RpcResult<GetTransactionsByAdditionRecordsResponse>;
+
+    async fn get_transactions_by_absolute_index_sets(
+        &self,
+        absolute_index_sets: Vec<RpcAbsoluteIndexSet>,
+    ) -> RpcResult<GetTransactionsByAbsoluteIndexSetsResponse> {
+        self.get_transactions_by_absolute_index_sets_call(
+            GetTransactionsByAbsoluteIndexSetsRequest {
+                absolute_index_sets,
+            },
+        )
+        .await
+    }
+    async fn get_transactions_by_absolute_index_sets_call(
+        &self,
+        request: GetTransactionsByAbsoluteIndexSetsRequest,
+    ) -> RpcResult<GetTransactionsByAbsoluteIndexSetsResponse>;
+
+    /// Return transaction most likely to be mined in next block, based on fee
+    /// density, sync status, and proof quality.
+    async fn best_transaction_for_next_block(
+        &self,
+    ) -> RpcResult<BestTransactionForNextBlockResponse> {
+        self.best_transaction_for_next_block_call(BestTransactionForNextBlockRequest {})
+            .await
+    }
+    async fn best_transaction_for_next_block_call(
+        &self,
+        request: BestTransactionForNextBlockRequest,
+    ) -> RpcResult<BestTransactionForNextBlockResponse>;
+
+    /* Networking */
+
+    async fn ban_call(&self, request: BanRequest) -> RpcResult<BanResponse>;
+    async fn ban(&self, address: String) -> RpcResult<BanResponse> {
+        self.ban_call(BanRequest { address }).await
+    }
+    async fn unban_call(&self, request: UnbanRequest) -> RpcResult<UnbanResponse>;
+    async fn unban(&self, address: String) -> RpcResult<UnbanResponse> {
+        self.unban_call(UnbanRequest { address }).await
+    }
+    async fn unban_all_call(&self, request: UnbanAllRequest) -> RpcResult<UnbanAllResponse>;
+    async fn unban_all(&self) -> RpcResult<UnbanAllResponse> {
+        self.unban_all_call(UnbanAllRequest {}).await
+    }
+    async fn dial_call(&self, request: DialRequest) -> RpcResult<DialResponse>;
+    async fn dial(&self, address: String) -> RpcResult<DialResponse> {
+        self.dial_call(DialRequest { address }).await
+    }
+    async fn probe_nat_call(&self, request: ProbeNatRequest) -> RpcResult<ProbeNatResponse>;
+    async fn probe_nat(&self) -> RpcResult<ProbeNatResponse> {
+        self.probe_nat_call(ProbeNatRequest {}).await
+    }
+    async fn reset_relay_reservations_call(
+        &self,
+        request: ResetRelayReservationsRequest,
+    ) -> RpcResult<ResetRelayReservationsResponse>;
+    async fn reset_relay_reservations(&self) -> RpcResult<ResetRelayReservationsResponse> {
+        self.reset_relay_reservations_call(ResetRelayReservationsRequest {})
+            .await
+    }
+}

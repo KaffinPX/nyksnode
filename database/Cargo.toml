@@ -1,0 +1,36 @@
+[package]
+name = "nyks-database"
+description = "LevelDB-backed async storage layer (schema, vectors, maps) used by nyks-node."
+authors = ["Triton Software"]
+
+version = "0.8.0"
+edition = "2021"
+license = "Apache-2.0"
+readme = "../README.md"
+
+homepage = "https://nyks.tech/"
+repository = "https://github.com/Nyksnet/nyksnode/"
+
+[dependencies]
+nyks-locks = { version = "0.8.0", path = "../locks" }
+anyhow = { version = "1.0", features = ["backtrace"] }
+async-stream = "0.3.6"
+async-trait = "0.1.83"
+bincode = "1.3"
+futures = "0.3"
+itertools = "0.14"
+leveldb-sys = "2.0.9"
+rand = "0.9"
+rs-leveldb = "0.1.5"
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1.47", features = ["rt", "sync", "macros"] }
+tracing = "0.1"
+
+[dev-dependencies]
+macro_rules_attr = "0.1.3"
+tokio = { version = "1.47", features = ["rt-multi-thread"] }
+tokio-test = "0.4"
+twenty-first = "1.1.0"
+
+[lints]
+workspace = true
