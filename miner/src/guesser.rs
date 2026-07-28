@@ -1,6 +1,9 @@
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
+use std::time::Duration;
+use std::time::Instant;
 
 use nyks_protocol::BFieldElement;
 use nyks_protocol::consensus::block::block_header::BlockPow;
@@ -127,10 +130,20 @@ impl Guesser {
         guesser_buffer: Arc<GuesserBuffer<POW_MEMORY_TREE_HEIGHT>>,
         cancel: Arc<AtomicBool>,
     ) {
+        let hashes_done = Arc::new(AtomicU64::new(0));
+        let logger_handle =
+            Self::spawn_hashrate_logger(hashes_done.clone(), cancel.clone());
+
         let mining_template = template.clone();
-        let mine_result =
-            tokio::task::spawn_blocking(move || mine(&mining_template, &guesser_buffer, &cancel))
-                .await;
+        let mine_result = tokio::task::spawn_blocking(move || {
+            mine(&mining_template, &guesser_buffer, &cancel, &hashes_done)
+        })
+        .await;
+
+        // Mining stopped for any reason (found/cancelled/exhausted/panicked) —
+        // stop the logger now rather than leaking a task that ticks forever.
+        logger_handle.abort();
+
         let pow = match mine_result {
             Ok(Some(pow)) => pow,
 
@@ -161,6 +174,24 @@ impl Guesser {
             }
         }
     }
+
+    fn spawn_hashrate_logger(
+        hashes_done: Arc<AtomicU64>,
+        cancel: Arc<AtomicBool>,
+    ) -> JoinHandle<()> {
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(10));
+            let start = Instant::now();
+            interval.tick().await;
+
+            while !cancel.load(Ordering::Relaxed) {
+                interval.tick().await;
+                let total = hashes_done.load(Ordering::Relaxed);
+                let rate = total as f64 / start.elapsed().as_secs_f64().max(0.001);
+                info!("Hashrate: {:.2} MH/s ({total} total)", rate / 1e6);
+            }
+        })
+    }
 }
 
 // Parallel nonce search. Returns None if cancelled or exhausted.
@@ -168,6 +199,7 @@ fn mine(
     template: &RpcBlockTemplate,
     guesser_buffer: &GuesserBuffer<POW_MEMORY_TREE_HEIGHT>,
     cancel: &AtomicBool,
+    hashes_done: &AtomicU64,
 ) -> Option<BlockPow> {
     // Check for cancellation every ~500k nonces rather than every iteration.
     const CHECKPOINT_DISTANCE: u64 = 1 << 19;
@@ -190,8 +222,11 @@ fn mine(
     (0u64..u64::MAX)
         .into_par_iter()
         .find_map_any(|i| {
-            if i % CHECKPOINT_DISTANCE == 0 && cancel.load(Ordering::Relaxed) {
-                return Some(None);
+            if i % CHECKPOINT_DISTANCE == 0 {
+                hashes_done.fetch_add(CHECKPOINT_DISTANCE, Ordering::Relaxed);
+                if cancel.load(Ordering::Relaxed) {
+                    return Some(None);
+                }
             }
 
             let nonce = Digest(bfe_array![n0, n1, n2, n3, i]);
