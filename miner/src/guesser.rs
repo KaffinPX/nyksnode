@@ -19,6 +19,7 @@ use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
+use tracing::error;
 use tracing::info;
 use tracing::warn;
 
@@ -131,48 +132,56 @@ impl Guesser {
         cancel: Arc<AtomicBool>,
     ) {
         let hashes_done = Arc::new(AtomicU64::new(0));
-        let logger_handle =
-            Self::spawn_hashrate_logger(hashes_done.clone(), cancel.clone());
+        let logger_handle = Self::spawn_hashrate_logger(hashes_done.clone(), cancel.clone());
 
-        let mining_template = template.clone();
-        let mine_result = tokio::task::spawn_blocking(move || {
-            mine(&mining_template, &guesser_buffer, &cancel, &hashes_done)
-        })
-        .await;
-
-        // Mining stopped for any reason (found/cancelled/exhausted/panicked) —
-        // stop the logger now rather than leaking a task that ticks forever.
-        logger_handle.abort();
-
-        let pow = match mine_result {
-            Ok(Some(pow)) => pow,
-
-            Ok(None) => {
-                info!("Mining stopped (cancelled or nonce space exhausted).");
-                return;
+        loop {
+            if cancel.load(Ordering::Relaxed) {
+                break;
             }
 
-            Err(e) => {
-                info!("Mining task panicked: {e}");
-                return;
-            }
-        };
+            let mining_template = template.clone();
+            let guesser_buffer = guesser_buffer.clone();
+            let cancel_for_mine = cancel.clone();
+            let hashes_done_for_mine = hashes_done.clone();
 
-        info!("Found the solution! Submitting to node...");
+            let mine_result = tokio::task::spawn_blocking(move || {
+                mine(
+                    &mining_template,
+                    &guesser_buffer,
+                    &cancel_for_mine,
+                    &hashes_done_for_mine,
+                )
+            })
+            .await;
 
-        match client.submit_block(template.block, pow.into()).await {
-            Ok(response) => {
-                if response.success {
-                    info!("Block is accepted by node.");
-                } else {
-                    warn!("Block is rejected by node, channel error.");
+            let pow = match mine_result {
+                Ok(Some(pow)) => pow,
+                Ok(None) => {
+                    info!("Mining stopped (cancelled or nonce space exhausted).");
+                    break;
                 }
-            }
-            Err(e) => {
-                // TODO: RETRY
-                warn!("Block is rejected by node, reason: {}", e);
+                Err(e) => {
+                    error!("Mining task panicked: {e}");
+                    break;
+                }
+            };
+
+            info!("Found the solution! Submitting to node...");
+
+            match client
+                .submit_block(template.block.clone(), pow.into())
+                .await
+            {
+                Ok(response) if response.success => {
+                    info!("Block is accepted by node.");
+                    break;
+                }
+                Ok(_) => warn!("Block is rejected by node, channel error. Retrying..."),
+                Err(e) => warn!("Block is rejected by node, reason: {}. Retrying...", e),
             }
         }
+
+        logger_handle.abort();
     }
 
     fn spawn_hashrate_logger(
