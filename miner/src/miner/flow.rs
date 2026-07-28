@@ -8,7 +8,7 @@ use nyks_rpc_client::http::HttpClient;
 use tokio::sync::RwLock;
 use tracing::info;
 
-use crate::guesser::Guesser;
+use crate::miner::guesser::Guesser;
 
 #[derive(Clone, Debug)]
 pub struct Miner {

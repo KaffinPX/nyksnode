@@ -7,10 +7,9 @@ use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 use crate::core::args::Args;
-use crate::flow::Miner;
+use crate::miner::flow::Miner;
 
-pub mod flow;
-pub mod guesser;
+pub mod miner;
 pub mod core;
 
 #[tokio::main]
