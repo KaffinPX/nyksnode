@@ -19,7 +19,6 @@ use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use tracing::error;
 use tracing::info;
 use tracing::warn;
 
@@ -33,7 +32,7 @@ struct MinerBuffer {
 // Holds the cancel flag so stop() can signal the blocking thread directly.
 #[derive(Debug)]
 struct MinerTask {
-    template: RpcBlockTemplate,
+    template: Arc<RpcBlockTemplate>,
     cancel: Arc<AtomicBool>,
     handle: JoinHandle<()>,
 }
@@ -62,15 +61,18 @@ impl Guesser {
         self.stop().await;
 
         let guesser_buffer = self.get_or_recompute_buffer(prev_block_digest).await;
+        let template = Arc::new(template);
+
         info!(
             "Switching to mining template {}...",
             template.block.kernel.mast_hash().to_hex()
         );
 
+        let cancel = Arc::new(AtomicBool::new(false));
+
         let client = self.client.clone();
         let task_template = template.clone();
-        let cancel = Arc::new(AtomicBool::new(false));
-        let task_cancel = Arc::clone(&cancel);
+        let task_cancel = cancel.clone();
 
         let handle = tokio::spawn(async move {
             Self::run_mining_task(client, task_template, guesser_buffer, task_cancel).await;
@@ -104,11 +106,11 @@ impl Guesser {
 
             *guard = Some(MinerBuffer {
                 digest: prev_block_digest,
-                buffer: Arc::clone(&new_buffer),
+                buffer: new_buffer.clone(),
             });
             new_buffer
         } else {
-            Arc::clone(&guard.as_ref().unwrap().buffer)
+            guard.as_ref().unwrap().buffer.clone()
         }
     }
 
@@ -127,7 +129,7 @@ impl Guesser {
 
     async fn run_mining_task(
         client: HttpClient,
-        template: RpcBlockTemplate,
+        template: Arc<RpcBlockTemplate>,
         guesser_buffer: Arc<GuesserBuffer<POW_MEMORY_TREE_HEIGHT>>,
         cancel: Arc<AtomicBool>,
     ) {
@@ -140,14 +142,14 @@ impl Guesser {
             }
 
             let mining_template = template.clone();
-            let guesser_buffer = guesser_buffer.clone();
+            let guesser_buffer_for_mine = guesser_buffer.clone();
             let cancel_for_mine = cancel.clone();
             let hashes_done_for_mine = hashes_done.clone();
 
             let mine_result = tokio::task::spawn_blocking(move || {
                 mine(
                     &mining_template,
-                    &guesser_buffer,
+                    &guesser_buffer_for_mine,
                     &cancel_for_mine,
                     &hashes_done_for_mine,
                 )
@@ -161,7 +163,7 @@ impl Guesser {
                     break;
                 }
                 Err(e) => {
-                    error!("Mining task panicked: {e}");
+                    info!("Mining task panicked: {e}");
                     break;
                 }
             };
