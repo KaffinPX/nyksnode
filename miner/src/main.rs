@@ -6,22 +6,12 @@ use nyks_rpc_client::http::HttpClient;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
+use crate::core::args::Args;
 use crate::flow::Miner;
 
 pub mod flow;
 pub mod guesser;
-
-#[derive(Parser)]
-#[command(name = "nyks-miner")]
-#[command(about = "A nyks CPU miner")]
-struct Args {
-    /// Address to mine for (coinbase reward receiver)
-    #[arg(long)]
-    address: String,
-    /// RPC URL to use (JSON/HTTP)
-    #[arg(long)]
-    rpc_url: String,
-}
+pub mod core;
 
 #[tokio::main]
 async fn main() -> Result<()> {
