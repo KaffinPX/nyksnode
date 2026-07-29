@@ -9,8 +9,8 @@ use tracing_subscriber::EnvFilter;
 use crate::core::args::Args;
 use crate::miner::flow::Miner;
 
-pub mod miner;
 pub mod core;
+pub mod miner;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -26,8 +26,10 @@ async fn main() -> Result<()> {
 
     info!("Initializing nyks-miner, the operator of nyks blocks...");
 
-    let client = HttpClient::new(args.rpc_url);
-    let miner = Miner::new(client, args.address);
+    args.validate_address();
+
+    let client = HttpClient::new(args.rpc_url.clone());
+    let miner = Miner::new(client, args.address.clone(), args.min_reward_fraction());
 
     miner.main_loop().await;
 

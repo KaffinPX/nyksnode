@@ -2,11 +2,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use num_traits::Zero;
+use nyks_protocol::consensus::block::Block;
 use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 use nyks_rpc_client::RpcApi;
 use nyks_rpc_client::http::HttpClient;
 use tokio::sync::RwLock;
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::miner::guesser::Guesser;
 
@@ -14,15 +15,17 @@ use crate::miner::guesser::Guesser;
 pub struct Miner {
     client: HttpClient,
     address: String,
+    min_reward_fraction: f64,
     guesser_reward: Arc<RwLock<NativeCurrencyAmount>>,
     guesser: Guesser,
 }
 
 impl Miner {
-    pub fn new(client: HttpClient, address: String) -> Self {
+    pub fn new(client: HttpClient, address: String, min_reward_fraction: f64) -> Self {
         Miner {
             client: client.clone(),
             address,
+            min_reward_fraction,
             guesser_reward: Arc::new(RwLock::new(NativeCurrencyAmount::zero())),
             guesser: Guesser::new(client),
         }
@@ -47,6 +50,18 @@ impl Miner {
 
         if let Some(template) = template {
             let new_guesser_reward = template.metadata.total_guesser_reward.0;
+            let total_reward = Block::block_subsidy(template.block.kernel.header.height);
+
+            let guesser_share = new_guesser_reward.to_nau() as f64 / total_reward.to_nau() as f64;
+            if guesser_share < self.min_reward_fraction {
+                debug!(
+                    "Skipping template: guesser share {:.2}% below minimum {:.2}%.",
+                    guesser_share * 100.0,
+                    self.min_reward_fraction * 100.0
+                );
+                return;
+            }
+
             let mut current_guesser_reward = self.guesser_reward.write().await;
 
             if new_guesser_reward > *current_guesser_reward {

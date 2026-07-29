@@ -1,5 +1,7 @@
 use clap::Parser;
 use nyks_protocol::consensus::network::Network;
+use nyks_standards::wallet::keys::address::Address;
+use nyks_standards::wallet::keys::address::Recipient;
 
 #[derive(Parser)]
 #[command(name = "nyks-miner")]
@@ -16,4 +18,27 @@ pub struct Args {
     /// Network we are going to mine on.
     #[arg(long, default_value_t = Network::Main)]
     pub network: Network,
+
+    /// Minimum guesser reward as a percentage of total block reward (0-100), default 10.
+    #[arg(long, default_value_t = 10.0)]
+    pub min_percentage_reward: f64,
+}
+
+impl Args {
+    /// Validates the percentage is in range and converts it to a fraction
+    /// (e.g. 10.0 -> 0.10) for internal use.
+    pub fn min_reward_fraction(&self) -> f64 {
+        assert!(
+            (0.0..=100.0).contains(&self.min_percentage_reward),
+            "min-percentage-reward must be between 0 and 100, got {}",
+            self.min_percentage_reward
+        );
+
+        self.min_percentage_reward / 100.0
+    }
+
+    /// Validates that `address` is a well-formed address for the selected network.
+    pub fn validate_address(&self) {
+        Address::from_bech32m(&self.address, self.network).expect("Invalid address");
+    }
 }
