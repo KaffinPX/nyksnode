@@ -1,6 +1,9 @@
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
+use std::time::Duration;
+use std::time::Instant;
 
 use nyks_protocol::BFieldElement;
 use nyks_protocol::consensus::block::block_header::BlockPow;
@@ -29,7 +32,7 @@ struct MinerBuffer {
 // Holds the cancel flag so stop() can signal the blocking thread directly.
 #[derive(Debug)]
 struct MinerTask {
-    template: RpcBlockTemplate,
+    template: Arc<RpcBlockTemplate>,
     cancel: Arc<AtomicBool>,
     handle: JoinHandle<()>,
 }
@@ -58,15 +61,18 @@ impl Guesser {
         self.stop().await;
 
         let guesser_buffer = self.get_or_recompute_buffer(prev_block_digest).await;
+        let template = Arc::new(template);
+
         info!(
             "Switching to mining template {}...",
             template.block.kernel.mast_hash().to_hex()
         );
 
+        let cancel = Arc::new(AtomicBool::new(false));
+
         let client = self.client.clone();
         let task_template = template.clone();
-        let cancel = Arc::new(AtomicBool::new(false));
-        let task_cancel = Arc::clone(&cancel);
+        let task_cancel = cancel.clone();
 
         let handle = tokio::spawn(async move {
             Self::run_mining_task(client, task_template, guesser_buffer, task_cancel).await;
@@ -100,11 +106,11 @@ impl Guesser {
 
             *guard = Some(MinerBuffer {
                 digest: prev_block_digest,
-                buffer: Arc::clone(&new_buffer),
+                buffer: new_buffer.clone(),
             });
             new_buffer
         } else {
-            Arc::clone(&guard.as_ref().unwrap().buffer)
+            guard.as_ref().unwrap().buffer.clone()
         }
     }
 
@@ -123,43 +129,79 @@ impl Guesser {
 
     async fn run_mining_task(
         client: HttpClient,
-        template: RpcBlockTemplate,
+        template: Arc<RpcBlockTemplate>,
         guesser_buffer: Arc<GuesserBuffer<POW_MEMORY_TREE_HEIGHT>>,
         cancel: Arc<AtomicBool>,
     ) {
-        let mining_template = template.clone();
-        let mine_result =
-            tokio::task::spawn_blocking(move || mine(&mining_template, &guesser_buffer, &cancel))
-                .await;
-        let pow = match mine_result {
-            Ok(Some(pow)) => pow,
+        let hashes_done = Arc::new(AtomicU64::new(0));
+        let logger_handle = Self::spawn_hashrate_logger(hashes_done.clone(), cancel.clone());
 
-            Ok(None) => {
-                info!("Mining stopped (cancelled or nonce space exhausted).");
-                return;
+        loop {
+            if cancel.load(Ordering::Relaxed) {
+                break;
             }
 
-            Err(e) => {
-                info!("Mining task panicked: {e}");
-                return;
-            }
-        };
+            let mining_template = template.clone();
+            let guesser_buffer_for_mine = guesser_buffer.clone();
+            let cancel_for_mine = cancel.clone();
+            let hashes_done_for_mine = hashes_done.clone();
 
-        info!("Found the solution! Submitting to node...");
+            let mine_result = tokio::task::spawn_blocking(move || {
+                mine(
+                    &mining_template,
+                    &guesser_buffer_for_mine,
+                    &cancel_for_mine,
+                    &hashes_done_for_mine,
+                )
+            })
+            .await;
 
-        match client.submit_block(template.block, pow.into()).await {
-            Ok(response) => {
-                if response.success {
-                    info!("Block is accepted by node.");
-                } else {
-                    warn!("Block is rejected by node, channel error.");
+            let pow = match mine_result {
+                Ok(Some(pow)) => pow,
+                Ok(None) => {
+                    info!("Mining stopped (cancelled or nonce space exhausted).");
+                    break;
                 }
-            }
-            Err(e) => {
-                // TODO: RETRY
-                warn!("Block is rejected by node, reason: {}", e);
+                Err(e) => {
+                    info!("Mining task panicked: {e}");
+                    break;
+                }
+            };
+
+            info!("Found the solution! Submitting to node...");
+
+            match client
+                .submit_block(template.block.clone(), pow.into())
+                .await
+            {
+                Ok(response) if response.success => {
+                    info!("Block is accepted by node.");
+                    break;
+                }
+                Ok(_) => warn!("Block is rejected by node, channel error. Retrying..."),
+                Err(e) => warn!("Block is rejected by node, reason: {}. Retrying...", e),
             }
         }
+
+        logger_handle.abort();
+    }
+
+    fn spawn_hashrate_logger(
+        hashes_done: Arc<AtomicU64>,
+        cancel: Arc<AtomicBool>,
+    ) -> JoinHandle<()> {
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(10));
+            let start = Instant::now();
+            interval.tick().await;
+
+            while !cancel.load(Ordering::Relaxed) {
+                interval.tick().await;
+                let total = hashes_done.load(Ordering::Relaxed);
+                let rate = total as f64 / start.elapsed().as_secs_f64().max(0.001);
+                info!("Hashrate: {:.2} MH/s ({total} total)", rate / 1e6);
+            }
+        })
     }
 }
 
@@ -168,6 +210,7 @@ fn mine(
     template: &RpcBlockTemplate,
     guesser_buffer: &GuesserBuffer<POW_MEMORY_TREE_HEIGHT>,
     cancel: &AtomicBool,
+    hashes_done: &AtomicU64,
 ) -> Option<BlockPow> {
     // Check for cancellation every ~500k nonces rather than every iteration.
     const CHECKPOINT_DISTANCE: u64 = 1 << 19;
@@ -190,8 +233,11 @@ fn mine(
     (0u64..u64::MAX)
         .into_par_iter()
         .find_map_any(|i| {
-            if i % CHECKPOINT_DISTANCE == 0 && cancel.load(Ordering::Relaxed) {
-                return Some(None);
+            if i % CHECKPOINT_DISTANCE == 0 {
+                hashes_done.fetch_add(CHECKPOINT_DISTANCE, Ordering::Relaxed);
+                if cancel.load(Ordering::Relaxed) {
+                    return Some(None);
+                }
             }
 
             let nonce = Digest(bfe_array![n0, n1, n2, n3, i]);
