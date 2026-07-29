@@ -1,5 +1,7 @@
 use clap::Parser;
 use nyks_protocol::consensus::network::Network;
+use nyks_rpc_client::RpcApi;
+use nyks_rpc_client::http::HttpClient;
 use nyks_standards::wallet::keys::address::Address;
 use nyks_standards::wallet::keys::address::Recipient;
 
@@ -35,6 +37,28 @@ impl Args {
         );
 
         self.min_percentage_reward / 100.0
+    }
+
+    /// Creates an RPC client and verifies that the connected node is on the
+    /// expected network.
+    pub async fn rpc_client(&self) -> HttpClient {
+        let client = HttpClient::new(self.rpc_url.clone());
+
+        let remote_network = client
+            .network()
+            .await
+            .expect("Failed to connect to RPC node")
+            .network
+            .parse::<Network>()
+            .unwrap();
+
+        assert_eq!(
+            self.network, remote_network,
+            "Network mismatch: expected {:?}, connected node is on {:?}",
+            self.network, remote_network,
+        );
+
+        client
     }
 
     /// Validates that `address` is a well-formed address for the selected network.

@@ -7,7 +7,8 @@ use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurren
 use nyks_rpc_client::RpcApi;
 use nyks_rpc_client::http::HttpClient;
 use tokio::sync::RwLock;
-use tracing::{debug, info};
+use tracing::debug;
+use tracing::info;
 
 use crate::miner::guesser::Guesser;
 

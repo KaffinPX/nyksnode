@@ -2,7 +2,6 @@ use std::panic;
 
 use anyhow::Result;
 use clap::Parser;
-use nyks_rpc_client::http::HttpClient;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -28,7 +27,7 @@ async fn main() -> Result<()> {
 
     args.validate_address();
 
-    let client = HttpClient::new(args.rpc_url.clone());
+    let client = args.rpc_client().await;
     let miner = Miner::new(client, args.address.clone(), args.min_reward_fraction());
 
     miner.main_loop().await;
