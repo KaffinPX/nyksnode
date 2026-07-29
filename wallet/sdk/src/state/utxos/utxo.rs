@@ -1,13 +1,13 @@
 use std::ops::Deref;
 
-use nyks_protocol::consensus::block::block_height::BlockHeight;
-use nyks_protocol::consensus::mutator_set::addition_record::AdditionRecord;
-use nyks_protocol::consensus::mutator_set::commit;
-use nyks_protocol::consensus::mutator_set::ms_membership_proof::MsMembershipProof;
-use nyks_protocol::consensus::mutator_set::removal_record::absolute_index_set::AbsoluteIndexSet;
-use nyks_protocol::consensus::transaction::utxo::Utxo;
-use nyks_protocol::twenty_first::tip5::Digest;
-use nyks_protocol::twenty_first::tip5::Tip5;
+use nyks_consensus::block::block_height::BlockHeight;
+use nyks_consensus::mutator_set::addition_record::AdditionRecord;
+use nyks_consensus::mutator_set::commit;
+use nyks_consensus::mutator_set::ms_membership_proof::MsMembershipProof;
+use nyks_consensus::mutator_set::removal_record::absolute_index_set::AbsoluteIndexSet;
+use nyks_consensus::transaction::utxo::Utxo;
+use nyks_consensus::twenty_first::tip5::Digest;
+use nyks_consensus::twenty_first::tip5::Tip5;
 use serde::Deserialize;
 use serde::Serialize;
 

@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::fmt::LowerHex;
 use std::str::FromStr;
 
-use nyks_protocol::consensus::block::block_height::BlockHeight;
+use nyks_consensus::block::block_height::BlockHeight;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
@@ -11,7 +11,7 @@ use tasm_lib::prelude::Digest;
 use tasm_lib::triton_vm::prelude::BFieldElement;
 use thiserror::Error;
 
-use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
+use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RpcNativeCurrencyAmount(pub NativeCurrencyAmount);

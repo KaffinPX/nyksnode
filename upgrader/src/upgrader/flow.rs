@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::time::Duration;
 
-use nyks_protocol::consensus::block::Block;
+use nyks_consensus::block::Block;
 use nyks_rpc_client::RpcApi;
 use nyks_rpc_client::block::transaction_kernel::RpcTransactionKernelId;
 use nyks_rpc_client::http::HttpClient;

@@ -6,8 +6,8 @@ use std::time::SystemTime;
 use arraystring::ArrayString;
 use arraystring::typenum::U30;
 use arraystring::typenum::U255;
-use nyks_protocol::consensus::block::block_header::BlockHeader;
-use nyks_protocol::consensus::network::Network;
+use nyks_consensus::block::block_header::BlockHeader;
+use nyks_consensus::network::Network;
 use serde::Deserialize;
 use serde::Serialize;
 

@@ -1,6 +1,6 @@
 use clap::Parser;
-use nyks_protocol::consensus::network::Network;
-use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
+use nyks_consensus::network::Network;
+use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 
 #[derive(Parser)]
 #[command(name = "nyks-upgrader")]

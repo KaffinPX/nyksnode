@@ -10,19 +10,19 @@ use tasm_lib::twenty_first::util_types::mmr;
 use tasm_lib::twenty_first::util_types::mmr::mmr_accumulator::MmrAccumulator;
 
 use crate::util_types::archival_mmr::ArchivalMmr;
+use nyks_consensus::mutator_set::active_window::ActiveWindow;
+use nyks_consensus::mutator_set::addition_record::AdditionRecord;
+use nyks_consensus::mutator_set::ms_membership_proof::MsMembershipProof;
+use nyks_consensus::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
+use nyks_consensus::mutator_set::removal_record::absolute_index_set::AbsoluteIndexSet;
+use nyks_consensus::mutator_set::removal_record::chunk::Chunk;
+use nyks_consensus::mutator_set::removal_record::chunk_dictionary::ChunkDictionary;
+use nyks_consensus::mutator_set::removal_record::RemovalRecord;
+use nyks_consensus::mutator_set::shared::BATCH_SIZE;
+use nyks_consensus::mutator_set::shared::CHUNK_SIZE;
+use nyks_consensus::mutator_set::shared::WINDOW_SIZE;
+use nyks_consensus::mutator_set::MutatorSetError;
 use nyks_database::storage::storage_vec::traits::*;
-use nyks_protocol::consensus::mutator_set::active_window::ActiveWindow;
-use nyks_protocol::consensus::mutator_set::addition_record::AdditionRecord;
-use nyks_protocol::consensus::mutator_set::ms_membership_proof::MsMembershipProof;
-use nyks_protocol::consensus::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
-use nyks_protocol::consensus::mutator_set::removal_record::absolute_index_set::AbsoluteIndexSet;
-use nyks_protocol::consensus::mutator_set::removal_record::chunk::Chunk;
-use nyks_protocol::consensus::mutator_set::removal_record::chunk_dictionary::ChunkDictionary;
-use nyks_protocol::consensus::mutator_set::removal_record::RemovalRecord;
-use nyks_protocol::consensus::mutator_set::shared::BATCH_SIZE;
-use nyks_protocol::consensus::mutator_set::shared::CHUNK_SIZE;
-use nyks_protocol::consensus::mutator_set::shared::WINDOW_SIZE;
-use nyks_protocol::consensus::mutator_set::MutatorSetError;
 
 #[derive(Debug, Clone)]
 pub struct ArchivalMutatorSet<MmrStorage, ChunkStorage>

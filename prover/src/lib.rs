@@ -8,11 +8,11 @@
 use std::path::PathBuf;
 use std::process::Stdio;
 
-use nyks_protocol::consensus::transaction::validity::neptune_proof::Proof;
-use nyks_protocol::triton_vm::error::InstructionError;
-use nyks_protocol::triton_vm::prelude::Program;
-use nyks_protocol::triton_vm::proof::Claim;
-use nyks_protocol::triton_vm::vm::NonDeterminism;
+use nyks_consensus::transaction::validity::neptune_proof::Proof;
+use nyks_consensus::triton_vm::error::InstructionError;
+use nyks_consensus::triton_vm::prelude::Program;
+use nyks_consensus::triton_vm::proof::Claim;
+use nyks_consensus::triton_vm::vm::NonDeterminism;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::watch;
 

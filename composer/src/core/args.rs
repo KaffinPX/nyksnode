@@ -1,11 +1,11 @@
 use clap::Parser;
 use num_traits::CheckedSub;
 use num_traits::Zero;
-use nyks_protocol::consensus::block::MINING_REWARD_TIME_LOCK_PERIOD;
-use nyks_protocol::consensus::network::Network;
-use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
-use nyks_protocol::proof_abstractions::timestamp::Timestamp;
-use nyks_protocol::tasm_lib::prelude::Digest;
+use nyks_consensus::block::MINING_REWARD_TIME_LOCK_PERIOD;
+use nyks_consensus::network::Network;
+use nyks_consensus::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::tasm_lib::prelude::Digest;
+use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 use nyks_standards::wallet::keys::address::Address;
 use nyks_standards::wallet::keys::address::Recipient;
 use nyks_wallet_core::transaction::builder::output::TxOutput;

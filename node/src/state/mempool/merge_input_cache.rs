@@ -5,8 +5,8 @@ use std::collections::VecDeque;
 use get_size2::GetSize;
 
 use crate::state::TransactionKernel;
-use nyks_protocol::consensus::transaction::transaction_kernel_id::TransactionKernelId;
-use nyks_protocol::consensus::transaction::validity::neptune_proof::NeptuneProof;
+use nyks_consensus::transaction::transaction_kernel_id::TransactionKernelId;
+use nyks_consensus::transaction::validity::neptune_proof::NeptuneProof;
 
 /// A transaction that was input to a merge of two transactions. In other words:
 /// either a or b in the operation merge(a, b) -> c, where a, b, and c are all

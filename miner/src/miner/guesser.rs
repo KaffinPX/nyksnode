@@ -5,12 +5,12 @@ use std::sync::atomic::Ordering;
 use std::time::Duration;
 use std::time::Instant;
 
-use nyks_protocol::BFieldElement;
-use nyks_protocol::consensus::block::block_header::BlockPow;
-use nyks_protocol::consensus::block::pow::GuesserBuffer;
-use nyks_protocol::consensus::block::pow::POW_MEMORY_TREE_HEIGHT;
-use nyks_protocol::tasm_lib::prelude::Digest;
-use nyks_protocol::tasm_lib::twenty_first::bfe_array;
+use nyks_consensus::BFieldElement;
+use nyks_consensus::block::block_header::BlockPow;
+use nyks_consensus::block::pow::GuesserBuffer;
+use nyks_consensus::block::pow::POW_MEMORY_TREE_HEIGHT;
+use nyks_consensus::tasm_lib::prelude::Digest;
+use nyks_consensus::tasm_lib::twenty_first::bfe_array;
 use nyks_rpc_client::RpcApi;
 use nyks_rpc_client::http::HttpClient;
 use nyks_rpc_client::mining::template::RpcBlockTemplate;

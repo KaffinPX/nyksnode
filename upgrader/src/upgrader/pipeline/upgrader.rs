@@ -4,8 +4,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::sync::watch;
 
-use nyks_protocol::consensus::transaction::validity::proof_collection::ProofCollection;
-use nyks_protocol::consensus::transaction::validity::single_proof::SingleProofWitness;
+use nyks_consensus::transaction::validity::proof_collection::ProofCollection;
+use nyks_consensus::transaction::validity::single_proof::SingleProofWitness;
 use nyks_prover::JobCancelSender;
 use nyks_rpc_client::block::transaction_kernel::RpcTransactionKernelId;
 use nyks_rpc_client::wallet::transaction::RpcTransaction;

@@ -1,15 +1,15 @@
 use std::ops::Deref;
 
-use nyks_protocol::tasm_lib::prelude::Digest;
-use nyks_protocol::tasm_lib::prelude::Tip5;
+use nyks_consensus::tasm_lib::prelude::Digest;
+use nyks_consensus::tasm_lib::prelude::Tip5;
 use serde::Deserialize;
 use serde::Serialize;
 
-use nyks_protocol::consensus::mutator_set::ms_membership_proof::MsMembershipProof;
-use nyks_protocol::consensus::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
-use nyks_protocol::consensus::mutator_set::removal_record::RemovalRecord;
-use nyks_protocol::consensus::transaction::lock_script::LockScriptAndWitness;
-use nyks_protocol::consensus::transaction::utxo::Utxo;
+use nyks_consensus::mutator_set::ms_membership_proof::MsMembershipProof;
+use nyks_consensus::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
+use nyks_consensus::mutator_set::removal_record::RemovalRecord;
+use nyks_consensus::transaction::lock_script::LockScriptAndWitness;
+use nyks_consensus::transaction::utxo::Utxo;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpendableUtxo {

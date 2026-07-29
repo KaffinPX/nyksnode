@@ -1,10 +1,10 @@
-use nyks_protocol::consensus::block::Block;
-use nyks_protocol::consensus::network::Network;
-use nyks_protocol::consensus::transaction::lock_script::LockScriptAndWitness;
-use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
-use nyks_protocol::proof_abstractions::timestamp::Timestamp;
-use nyks_protocol::triton_vm::vm::PublicInput;
-use nyks_protocol::twenty_first::tip5::Digest;
+use nyks_consensus::block::Block;
+use nyks_consensus::network::Network;
+use nyks_consensus::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::transaction::lock_script::LockScriptAndWitness;
+use nyks_consensus::triton_vm::vm::PublicInput;
+use nyks_consensus::twenty_first::tip5::Digest;
+use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 use nyks_wallet_core::transaction::builder::TransactionBuilder;
 use nyks_wallet_core::transaction::builder::input::TxInputList;
 use nyks_wallet_core::transaction::builder::output::TxOutput;

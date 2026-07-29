@@ -4,12 +4,12 @@ use tasm_lib::prelude::Digest;
 
 use crate::model::block::transaction_kernel::RpcTransactionKernel;
 use crate::model::common::RpcBFieldElements;
-use nyks_protocol::consensus::transaction::Transaction;
-use nyks_protocol::consensus::transaction::TransactionProof;
-use nyks_protocol::consensus::transaction::utxo::Coin;
-use nyks_protocol::consensus::transaction::utxo::Utxo;
-use nyks_protocol::consensus::transaction::validity::neptune_proof::NeptuneProof;
-use nyks_protocol::consensus::transaction::validity::proof_collection::ProofCollection;
+use nyks_consensus::transaction::Transaction;
+use nyks_consensus::transaction::TransactionProof;
+use nyks_consensus::transaction::utxo::Coin;
+use nyks_consensus::transaction::utxo::Utxo;
+use nyks_consensus::transaction::validity::neptune_proof::NeptuneProof;
+use nyks_consensus::transaction::validity::proof_collection::ProofCollection;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RpcNeptuneProof(RpcBFieldElements);

@@ -1,8 +1,8 @@
 use anyhow::Result;
 use anyhow::ensure;
-use nyks_protocol::BFieldElement;
-use nyks_protocol::consensus::network::Network;
-use nyks_protocol::twenty_first::tip5::Tip5;
+use nyks_consensus::BFieldElement;
+use nyks_consensus::network::Network;
+use nyks_consensus::twenty_first::tip5::Tip5;
 use sha3::Shake256;
 use sha3::digest::ExtendableOutput;
 use sha3::digest::Update;

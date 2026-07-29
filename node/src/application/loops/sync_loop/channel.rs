@@ -1,6 +1,6 @@
+use nyks_consensus::block::block_height::BlockHeight;
+use nyks_consensus::block::Block;
 use nyks_p2p::peer::synchronization_bit_mask::SynchronizationBitMask;
-use nyks_protocol::consensus::block::block_height::BlockHeight;
-use nyks_protocol::consensus::block::Block;
 
 use super::PeerHandle;
 use crate::application::loops::sync_loop::sync_progress::SyncProgress;

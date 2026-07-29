@@ -6,8 +6,8 @@ use rand::RngCore;
 use tokio::fs;
 
 use crate::application::loops::sync_loop::SynchronizationBitMask;
-use nyks_protocol::consensus::block::block_height::BlockHeight;
-use nyks_protocol::consensus::block::Block;
+use nyks_consensus::block::block_height::BlockHeight;
+use nyks_consensus::block::Block;
 
 /// The state of a rapid block download process.
 ///

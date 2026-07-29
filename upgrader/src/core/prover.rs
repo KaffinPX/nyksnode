@@ -1,8 +1,8 @@
-use nyks_protocol::consensus::transaction::validity::neptune_proof::Proof;
-use nyks_protocol::consensus::transaction::validity::single_proof::SingleProof;
-use nyks_protocol::consensus::transaction::validity::single_proof::SingleProofWitness;
-use nyks_protocol::proof_abstractions::SecretWitness;
-use nyks_protocol::proof_abstractions::tasm::program::TritonProgram;
+use nyks_consensus::proof_abstractions::SecretWitness;
+use nyks_consensus::proof_abstractions::tasm::program::TritonProgram;
+use nyks_consensus::transaction::validity::neptune_proof::Proof;
+use nyks_consensus::transaction::validity::single_proof::SingleProof;
+use nyks_consensus::transaction::validity::single_proof::SingleProofWitness;
 use nyks_prover::JobCancelReceiver;
 use nyks_prover::ProverJob;
 use nyks_prover::ProverJobSettings;

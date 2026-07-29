@@ -1,18 +1,18 @@
 use num_traits::CheckedSub;
 use num_traits::Zero;
-use nyks_protocol::consensus::block::Block;
-use nyks_protocol::consensus::block::block_transaction::BlockOrRegularTransaction;
-use nyks_protocol::consensus::block::block_transaction::BlockTransaction;
-use nyks_protocol::consensus::consensus_rule_set::ConsensusRuleSet;
-use nyks_protocol::consensus::transaction::Transaction;
-use nyks_protocol::consensus::transaction::TransactionProof;
-use nyks_protocol::consensus::transaction::validity::neptune_proof::Proof;
-use nyks_protocol::consensus::transaction::validity::single_proof::SingleProof;
-use nyks_protocol::consensus::transaction::validity::single_proof::SingleProofWitness;
-use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
-use nyks_protocol::proof_abstractions::SecretWitness;
-use nyks_protocol::proof_abstractions::tasm::program::TritonProgram;
-use nyks_protocol::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::block::Block;
+use nyks_consensus::block::block_transaction::BlockOrRegularTransaction;
+use nyks_consensus::block::block_transaction::BlockTransaction;
+use nyks_consensus::consensus_rule_set::ConsensusRuleSet;
+use nyks_consensus::proof_abstractions::SecretWitness;
+use nyks_consensus::proof_abstractions::tasm::program::TritonProgram;
+use nyks_consensus::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::transaction::Transaction;
+use nyks_consensus::transaction::TransactionProof;
+use nyks_consensus::transaction::validity::neptune_proof::Proof;
+use nyks_consensus::transaction::validity::single_proof::SingleProof;
+use nyks_consensus::transaction::validity::single_proof::SingleProofWitness;
+use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 use nyks_prover::JobCancelReceiver;
 use nyks_prover::ProverJob;
 use nyks_prover::ProverJobSettings;
@@ -239,8 +239,8 @@ impl TransactionProver {
     /// kills the worker process rather than just stopping our wait on it.
     async fn prove_single(
         &self,
-        claim: nyks_protocol::triton_vm::proof::Claim,
-        nondeterminism: nyks_protocol::triton_vm::vm::NonDeterminism,
+        claim: nyks_consensus::triton_vm::proof::Claim,
+        nondeterminism: nyks_consensus::triton_vm::vm::NonDeterminism,
         rx: JobCancelReceiver,
     ) -> Result<Proof, TransactionProverError> {
         let job = ProverJob::new(

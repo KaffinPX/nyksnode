@@ -14,14 +14,14 @@ use crate::application::config::data_directory::DataDirectory;
 use crate::application::loops::sync_loop::sync_progress::SyncProgress;
 use crate::state::database::PeerDatabases;
 use crate::state::sync_status::SyncStatus;
+use nyks_consensus::block::block_height::BlockHeight;
+use nyks_consensus::block::difficulty_control::ProofOfWork;
 use nyks_database::create_db_if_missing;
 use nyks_database::NeptuneLevelDb;
 use nyks_database::WriteBatchAsync;
 use nyks_p2p::peer::peer_info::PeerInfo;
 use nyks_p2p::peer::InstanceId;
 use nyks_p2p::peer::PeerStanding;
-use nyks_protocol::consensus::block::block_height::BlockHeight;
-use nyks_protocol::consensus::block::difficulty_control::ProofOfWork;
 
 pub const BANNED_IPS_DB_NAME: &str = "banned_ips";
 

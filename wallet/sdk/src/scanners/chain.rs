@@ -1,16 +1,16 @@
 use std::collections::VecDeque;
 
-use nyks_protocol::BFieldElement;
-use nyks_protocol::consensus::block::Block;
-use nyks_protocol::consensus::block::block_height::BlockHeight;
-use nyks_protocol::consensus::block::block_kernel::BlockKernel;
-use nyks_protocol::consensus::network::Network;
-use nyks_protocol::consensus::transaction::announcement::Announcement;
-use nyks_protocol::consensus::transaction::utxo::Utxo;
-use nyks_protocol::consensus::transaction::utxo_triple::UtxoTriple;
-use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
-use nyks_protocol::twenty_first::tip5::Digest;
-use nyks_protocol::twenty_first::util_types::mmr::mmr_trait::Mmr;
+use nyks_consensus::BFieldElement;
+use nyks_consensus::block::Block;
+use nyks_consensus::block::block_height::BlockHeight;
+use nyks_consensus::block::block_kernel::BlockKernel;
+use nyks_consensus::network::Network;
+use nyks_consensus::transaction::announcement::Announcement;
+use nyks_consensus::transaction::utxo::Utxo;
+use nyks_consensus::transaction::utxo_triple::UtxoTriple;
+use nyks_consensus::twenty_first::tip5::Digest;
+use nyks_consensus::twenty_first::util_types::mmr::mmr_trait::Mmr;
+use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 use nyks_rpc_client::wallet::block::RpcWalletBlock;
 use nyks_standards::wallet::allocations::Allocations;
 use nyks_standards::wallet::keys::address::Recipient;

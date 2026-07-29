@@ -2,8 +2,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use num_traits::Zero;
-use nyks_protocol::consensus::block::Block;
-use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
+use nyks_consensus::block::Block;
+use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 use nyks_rpc_client::RpcApi;
 use nyks_rpc_client::http::HttpClient;
 use tokio::sync::RwLock;

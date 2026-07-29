@@ -7,11 +7,11 @@ use nyks_p2p::peer::synchronization_bit_mask::SynchronizationBitMask;
 use tasm_lib::triton_vm::prelude::Digest;
 use tasm_lib::twenty_first::util_types::mmr::mmr_accumulator::MmrAccumulator;
 
+use nyks_consensus::block::block_height::BlockHeight;
+use nyks_consensus::block::difficulty_control::ProofOfWork;
+use nyks_consensus::block::Block;
+use nyks_consensus::transaction::Transaction;
 use nyks_p2p::peer::transaction_notification::TransactionNotification;
-use nyks_protocol::consensus::block::block_height::BlockHeight;
-use nyks_protocol::consensus::block::difficulty_control::ProofOfWork;
-use nyks_protocol::consensus::block::Block;
-use nyks_protocol::consensus::transaction::Transaction;
 
 #[derive(Clone, Debug, strum::Display)]
 pub(crate) enum MainToPeerTask {

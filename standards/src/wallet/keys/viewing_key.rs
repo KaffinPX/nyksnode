@@ -1,6 +1,6 @@
-use nyks_protocol::BFieldElement;
-use nyks_protocol::consensus::transaction::utxo::Utxo;
-use nyks_protocol::twenty_first::tip5::Digest;
+use nyks_consensus::BFieldElement;
+use nyks_consensus::transaction::utxo::Utxo;
+use nyks_consensus::twenty_first::tip5::Digest;
 use zeroize::Zeroize;
 use zeroize::ZeroizeOnDrop;
 

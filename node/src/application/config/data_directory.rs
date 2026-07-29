@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use anyhow::Context;
 use anyhow::Result;
 use directories::ProjectDirs;
-use nyks_protocol::consensus::network::Network;
+use nyks_consensus::network::Network;
 use serde::Deserialize;
 use serde::Serialize;
 

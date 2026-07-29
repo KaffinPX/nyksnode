@@ -4,10 +4,10 @@ pub mod output;
 
 use num_traits::Zero;
 
-use nyks_protocol::consensus::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
-use nyks_protocol::consensus::transaction::transaction_kernel::TransactionKernelProxy;
-use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
-use nyks_protocol::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
+use nyks_consensus::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::transaction::transaction_kernel::TransactionKernelProxy;
+use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 use thiserror::Error;
 
 use crate::transaction::BuilderTransaction;

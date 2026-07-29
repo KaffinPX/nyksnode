@@ -12,7 +12,7 @@ repository = "https://github.com/Nyksnet/nyksnode/"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "1.0.65"
-nyks-protocol = { version = "0.8.0", path = "../../protocol" }
+nyks-consensus = { version = "0.8.0", path = "../../consensus" }
 nyks-standards = { version = "0.8.0", path = "../../standards" }
 tasm-lib = "7.0.0"
 hex = "0.4.3"

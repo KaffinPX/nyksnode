@@ -4,8 +4,8 @@ use tasm_lib::prelude::Digest;
 
 use crate::model::block::RpcBlock;
 use crate::model::common::RpcNativeCurrencyAmount;
-use nyks_protocol::consensus::block::Block;
-use nyks_protocol::consensus::block::pow::PowMastPaths;
+use nyks_consensus::block::Block;
+use nyks_consensus::block::pow::PowMastPaths;
 
 /// Data required to attempt to solve the proof-of-work puzzle that allows the
 /// minting of the next block.

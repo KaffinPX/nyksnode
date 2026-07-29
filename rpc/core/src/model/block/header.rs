@@ -7,15 +7,15 @@ use tasm_lib::prelude::Digest;
 use tasm_lib::triton_vm::prelude::BFieldElement;
 
 use crate::model::block::transaction_kernel::RpcTransactionKernel;
-use nyks_protocol::consensus::block::block_header::BlockHeader;
-use nyks_protocol::consensus::block::block_header::BlockPow;
-use nyks_protocol::consensus::block::block_height::BlockHeight;
-use nyks_protocol::consensus::block::difficulty_control::Difficulty;
-use nyks_protocol::consensus::block::difficulty_control::ProofOfWork;
-use nyks_protocol::consensus::block::guesser_receiver_data::GuesserReceiverData;
-use nyks_protocol::consensus::block::pow::POW_MEMORY_TREE_HEIGHT;
-use nyks_protocol::consensus::transaction::transaction_kernel::TransactionKernel;
-use nyks_protocol::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::block::block_header::BlockHeader;
+use nyks_consensus::block::block_header::BlockPow;
+use nyks_consensus::block::block_height::BlockHeight;
+use nyks_consensus::block::difficulty_control::Difficulty;
+use nyks_consensus::block::difficulty_control::ProofOfWork;
+use nyks_consensus::block::guesser_receiver_data::GuesserReceiverData;
+use nyks_consensus::block::pow::POW_MEMORY_TREE_HEIGHT;
+use nyks_consensus::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::transaction::transaction_kernel::TransactionKernel;
 
 // TODO: Mirror consensus impl (RpcBlockPow = RpcPow<POW_MEMORY_TREE_HEIGHT>)
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]

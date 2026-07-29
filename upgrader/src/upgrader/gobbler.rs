@@ -1,14 +1,14 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
 
-use nyks_protocol::consensus::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
-use nyks_protocol::consensus::transaction::Transaction;
-use nyks_protocol::consensus::transaction::TransactionProof;
-use nyks_protocol::consensus::transaction::validity::single_proof::SingleProofWitness;
-use nyks_protocol::consensus::transaction::validity::tasm::single_proof::merge_branch::MergeWitness;
-use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
-use nyks_protocol::proof_abstractions::timestamp::Timestamp;
-use nyks_protocol::twenty_first::tip5::Digest;
+use nyks_consensus::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
+use nyks_consensus::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::transaction::Transaction;
+use nyks_consensus::transaction::TransactionProof;
+use nyks_consensus::transaction::validity::single_proof::SingleProofWitness;
+use nyks_consensus::transaction::validity::tasm::single_proof::merge_branch::MergeWitness;
+use nyks_consensus::twenty_first::tip5::Digest;
+use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 use nyks_rpc_client::block::transaction_kernel::RpcTransactionKernel;
 use nyks_rpc_client::wallet::transaction::RpcTransaction;
 use nyks_rpc_client::wallet::transaction::RpcTransactionProof;

@@ -8,7 +8,7 @@ use tasm_lib::twenty_first::prelude::MmrMembershipProof;
 
 use crate::model::block::body::RpcMutatorSetAccumulator;
 use crate::model::block::transaction_kernel::RpcChunkDictionary;
-use nyks_protocol::consensus::mutator_set::ms_membership_proof::MsMembershipProof;
+use nyks_consensus::mutator_set::ms_membership_proof::MsMembershipProof;
 use nyks_standards::mutator_set::IndexedAoclAuthPath;
 use nyks_standards::mutator_set::MsMembershipProofPrivacyPreserving;
 

@@ -1,8 +1,8 @@
-use nyks_protocol::consensus::mutator_set::MutatorSetError;
-use nyks_protocol::consensus::mutator_set::ms_membership_proof::MsMembershipProof;
-use nyks_protocol::consensus::mutator_set::removal_record::chunk_dictionary::ChunkDictionary;
-use nyks_protocol::tasm_lib::prelude::Digest;
-use nyks_protocol::tasm_lib::twenty_first::prelude::MmrMembershipProof;
+use nyks_consensus::mutator_set::MutatorSetError;
+use nyks_consensus::mutator_set::ms_membership_proof::MsMembershipProof;
+use nyks_consensus::mutator_set::removal_record::chunk_dictionary::ChunkDictionary;
+use nyks_consensus::tasm_lib::prelude::Digest;
+use nyks_consensus::tasm_lib::twenty_first::prelude::MmrMembershipProof;
 use serde::Deserialize;
 use serde::Serialize;
 

@@ -1,5 +1,5 @@
 use clap::Parser;
-use nyks_protocol::consensus::network::Network;
+use nyks_consensus::network::Network;
 use nyks_rpc_client::RpcApi;
 use nyks_rpc_client::http::HttpClient;
 use nyks_standards::wallet::keys::address::Address;

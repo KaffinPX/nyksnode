@@ -1,6 +1,6 @@
 use num_traits::CheckedSub;
-use nyks_protocol::consensus::network::Network;
-use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
+use nyks_consensus::network::Network;
+use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 use nyks_standards::wallet::keys::address::Address;
 use nyks_standards::wallet::keys::address::Recipient;
 use nyks_standards::wallet::keys::key::KeyType;

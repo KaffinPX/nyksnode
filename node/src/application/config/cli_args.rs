@@ -12,13 +12,13 @@ use clap::Parser;
 use libp2p::multiaddr::Protocol;
 use libp2p::Multiaddr;
 use num_traits::Zero;
-use nyks_protocol::consensus::transaction::transaction_proof::TransactionProofQuality;
+use nyks_consensus::transaction::transaction_proof::TransactionProofQuality;
 use tracing::error;
 
 use crate::application::config::parser::multiaddr::parse_to_multiaddr;
 use crate::state::mining::block_proposal::BlockProposalRejectError;
-use nyks_protocol::consensus::network::Network;
-use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
+use nyks_consensus::network::Network;
+use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 use nyks_rpc_core::api::ops::Namespace;
 
 const MAX_NUM_INPUTS_FOR_PC_BACKED_TXS: u64 = 200;

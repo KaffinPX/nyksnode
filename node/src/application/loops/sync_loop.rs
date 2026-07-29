@@ -5,9 +5,9 @@ use std::time::Duration;
 use std::time::SystemTime;
 
 use itertools::Itertools;
+use nyks_consensus::block::block_height::BlockHeight;
+use nyks_consensus::block::Block;
 use nyks_p2p::peer::synchronization_bit_mask::SynchronizationBitMask;
-use nyks_protocol::consensus::block::block_height::BlockHeight;
-use nyks_protocol::consensus::block::Block;
 use rand::rng;
 use rand::Rng;
 use tokio::sync::mpsc;

@@ -9,14 +9,14 @@ use tasm_lib::prelude::Tip5;
 use tracing::warn;
 
 use crate::application::config::data_directory::DataDirectory;
+use nyks_consensus::block::block_height::BlockHeight;
+use nyks_consensus::block::Block;
+use nyks_consensus::mutator_set::addition_record::AdditionRecord;
+use nyks_consensus::mutator_set::removal_record::absolute_index_set::AbsoluteIndexSet;
 use nyks_database::create_db_if_missing;
 use nyks_database::storage::storage_schema::traits::*;
 use nyks_database::NeptuneLevelDb;
 use nyks_database::WriteBatchAsync;
-use nyks_protocol::consensus::block::block_height::BlockHeight;
-use nyks_protocol::consensus::block::Block;
-use nyks_protocol::consensus::mutator_set::addition_record::AdditionRecord;
-use nyks_protocol::consensus::mutator_set::removal_record::absolute_index_set::AbsoluteIndexSet;
 use nyks_standards::wallet::notes::announcement_flag::AnnouncementFlag;
 
 /// The maximum number of blocks stored for each [`AnnouncementFlag`]. Wallets
@@ -42,7 +42,7 @@ pub const MAX_NUM_BLOCKS_IN_LOOKUP_LIST: usize = 10_000;
 /// Block heights are often preferred over block digests due to their smaller
 /// serialized size (8 bytes vs. 40).
 ///
-/// [`ArchivalMutatorSet`]: nyks_protocol::consensus::mutator_set::archival_mutator_set::ArchivalMutatorSet
+/// [`ArchivalMutatorSet`]: nyks_consensus::mutator_set::archival_mutator_set::ArchivalMutatorSet
 /// [`ArchivalState`]: crate::state::archival_state::ArchivalState
 #[derive(Debug)]
 pub(crate) struct RustyUtxoIndex {

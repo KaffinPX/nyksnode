@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
-use nyks_protocol::BFieldElement;
-use nyks_protocol::consensus::transaction::announcement::Announcement;
+use nyks_consensus::BFieldElement;
+use nyks_consensus::transaction::announcement::Announcement;
 use serde::Deserialize;
 use serde::Serialize;
 

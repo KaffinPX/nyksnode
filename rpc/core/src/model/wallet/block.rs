@@ -5,7 +5,7 @@ use tasm_lib::prelude::Tip5;
 use tasm_lib::triton_vm::prelude::BFieldCodec;
 
 use crate::model::block::RpcBlockKernel;
-use nyks_protocol::consensus::block::Block;
+use nyks_consensus::block::Block;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
