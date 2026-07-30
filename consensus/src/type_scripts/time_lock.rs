@@ -662,3 +662,14 @@ impl TypeScriptWitness for TimeLockWitness {
         }
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::proof_abstractions::tasm::program::tests::test_program_snapshot;
+
+    test_program_snapshot!(
+        TimeLock,
+        "4b4d251947a07f9f2c016c1c271c04ce41013ff50031bd42854919be6e0e4849ebf931e856b542ad"
+    );
+}

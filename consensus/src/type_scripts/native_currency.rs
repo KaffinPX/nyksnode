@@ -728,3 +728,14 @@ impl SecretWitness for NativeCurrencyWitness {
             .with_ram(memory)
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::proof_abstractions::tasm::program::tests::test_program_snapshot;
+
+    test_program_snapshot!(
+        NativeCurrency,
+        "76e11a0def69ae7761379955f776dc096a0858edd67b98049115da7e882951e2c11127bd85b10c20"
+    );
+}
