@@ -326,3 +326,14 @@ impl TritonProgram for BlockProgram {
         *HASH.get_or_init(|| self.program().hash())
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::proof_abstractions::tasm::program::tests::test_program_snapshot;
+
+    test_program_snapshot!(
+        BlockProgram,
+        "2d3fe8ddca93ac8be7f92a53c541f6dbb971ab2817cbc1743c8b5a3b3c99b6caf0102385258a828d"
+    );
+}
