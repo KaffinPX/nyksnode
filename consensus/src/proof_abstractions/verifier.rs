@@ -1,7 +1,10 @@
 use tasm_lib::triton_vm;
 use tasm_lib::triton_vm::proof::Claim;
+use tasm_lib::triton_vm::proof::Proof as VmProof;
+use tasm_lib::triton_vm::proof_stream::ProofStream;
 use tasm_lib::triton_vm::stark::Stark;
 use tokio::task;
+use tracing::debug;
 
 use crate::network::Network;
 use crate::transaction::validity::nyks_proof::NyksProof;
@@ -40,6 +43,54 @@ static CLAIMS_CACHE: std::sync::LazyLock<tokio::sync::Mutex<std::collections::Ha
 static CLAIMS_CACHE_ENABLED: std::sync::LazyLock<tokio::sync::Mutex<bool>> =
     std::sync::LazyLock::new(|| tokio::sync::Mutex::new(true));
 
+/// The number of proof items that Triton VM's verifier reads from a proof of
+/// the padded height indicated by the proof.
+///
+/// Returns `None` if the proof does not encode a padded height, or if no FRI
+/// parameters exist for that padded height.
+fn expected_num_proof_items(stark: Stark, proof: &VmProof) -> Option<usize> {
+    /// Items read outside of FRI: the padded height, three Merkle roots, four
+    /// out-of-domain rows, the out-of-domain quotient segments, and, for each of
+    /// the three tables, the revealed rows plus their authentication structure.
+    const NUM_ITEMS_OUTSIDE_FRI: usize = 15;
+
+    /// Items read by FRI independently of the number of rounds: the Merkle root
+    /// of the first round, the last round's codeword and polynomial, and the
+    /// first round's revealed leafs.
+    const NUM_ROUND_INDEPENDENT_FRI_ITEMS: usize = 4;
+
+    /// Items read by FRI for every round: a Merkle root, and the revealed leafs
+    /// of the round's partial codeword.
+    const NUM_FRI_ITEMS_PER_ROUND: usize = 2;
+
+    let padded_height = proof.padded_height().ok()?;
+    let num_fri_rounds = stark.fri(padded_height).ok()?.num_rounds();
+
+    Some(
+        NUM_ITEMS_OUTSIDE_FRI
+            + NUM_ROUND_INDEPENDENT_FRI_ITEMS
+            + NUM_FRI_ITEMS_PER_ROUND * num_fri_rounds,
+    )
+}
+
+/// Determine whether the proof holds exactly those proof items that Triton VM's
+/// verifier reads, and no others.
+///
+/// Triton VM's native verifier ignores any items beyond the ones it reads,
+/// whereas the verifier running *inside* the VM rejects them. A transaction
+/// carrying such a proof would therefore be relayed by every node but could
+/// never be merged into a block transaction.
+fn has_expected_num_proof_items(proof: &VmProof) -> bool {
+    let Some(expected_num_items) = expected_num_proof_items(Stark::default(), proof) else {
+        return false;
+    };
+    let Ok(proof_stream) = ProofStream::try_from(proof) else {
+        return false;
+    };
+
+    proof_stream.items.len() == expected_num_items
+}
+
 /// Verify a Triton VM (claim, proof) pair for default STARK parameters.
 ///
 /// When the test flag is set, this function checks whether the claim is present
@@ -59,6 +110,11 @@ pub async fn verify(claim: Claim, proof: NyksProof, network: Network) -> bool {
         if is_enabled && CLAIMS_CACHE.lock().await.contains(&claim) {
             return true;
         }
+    }
+
+    if !has_expected_num_proof_items(&proof) {
+        debug!("Rejecting proof that holds an unexpected number of proof items!");
+        return false;
     }
 
     #[cfg(test)]
