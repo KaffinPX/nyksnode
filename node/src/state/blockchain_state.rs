@@ -3,8 +3,8 @@ use tasm_lib::prelude::Digest;
 use super::archival_state::ArchivalState;
 use super::light_state::LightState;
 use crate::Block;
-use nyks_protocol::consensus::block::block_height::BlockHeight;
-use nyks_protocol::consensus::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
+use nyks_consensus::block::block_height::BlockHeight;
+use nyks_consensus::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
 
 /// `BlockChainState` provides an `Archival` variant
 /// for full nodes and a `Light` variant for light nodes.

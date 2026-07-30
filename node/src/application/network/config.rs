@@ -2,7 +2,7 @@ use std::net::IpAddr;
 use std::path::PathBuf;
 
 use libp2p::Multiaddr;
-use nyks_protocol::consensus::network::Network;
+use nyks_consensus::network::Network;
 
 pub(crate) const DEFAULT_SUBDIRECTORY: &str = "network/";
 pub(crate) const DEFAULT_IDENTITY_FILENAME: &str = "identity.key";

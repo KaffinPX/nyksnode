@@ -1,4 +1,4 @@
-use nyks_protocol::consensus::block::Block;
+use nyks_consensus::block::Block;
 use nyks_prover::{JobCancelReceiver, JobCancelSender, ProverJobSettings};
 use thiserror::Error;
 use tokio::sync::watch;

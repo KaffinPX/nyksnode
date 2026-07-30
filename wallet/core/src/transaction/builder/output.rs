@@ -3,7 +3,7 @@
 use std::ops::Deref;
 use std::ops::DerefMut;
 
-use nyks_protocol::tasm_lib::prelude::Digest;
+use nyks_consensus::tasm_lib::prelude::Digest;
 use nyks_standards::wallet::keys::address::Address;
 use nyks_standards::wallet::keys::address::Recipient;
 use nyks_standards::wallet::notes::utxo_notification::PrivateNotificationData;
@@ -11,13 +11,13 @@ use nyks_standards::wallet::notes::utxo_notification::UtxoNotificationPayload;
 use serde::Deserialize;
 use serde::Serialize;
 
-use nyks_protocol::consensus::mutator_set::addition_record::AdditionRecord;
-use nyks_protocol::consensus::network::Network;
-use nyks_protocol::consensus::transaction::announcement::Announcement;
-use nyks_protocol::consensus::transaction::utxo::Utxo;
-use nyks_protocol::consensus::transaction::utxo_triple::UtxoTriple;
-use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
-use nyks_protocol::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::mutator_set::addition_record::AdditionRecord;
+use nyks_consensus::network::Network;
+use nyks_consensus::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::transaction::announcement::Announcement;
+use nyks_consensus::transaction::utxo::Utxo;
+use nyks_consensus::transaction::utxo_triple::UtxoTriple;
+use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 
 use crate::transaction::utxo::notifications::UtxoNotificationMedium;
 use crate::transaction::utxo::notifications::UtxoNotificationMethod;

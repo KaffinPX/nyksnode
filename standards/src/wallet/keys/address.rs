@@ -1,8 +1,8 @@
-use nyks_protocol::BFieldElement;
-use nyks_protocol::consensus::network::Network;
-use nyks_protocol::consensus::transaction::announcement::Announcement;
-use nyks_protocol::consensus::transaction::lock_script::LockScript;
-use nyks_protocol::tasm_lib::prelude::Digest;
+use nyks_consensus::BFieldElement;
+use nyks_consensus::network::Network;
+use nyks_consensus::tasm_lib::prelude::Digest;
+use nyks_consensus::transaction::announcement::Announcement;
+use nyks_consensus::transaction::lock_script::LockScript;
 use serde::Deserialize;
 use serde::Serialize;
 use thiserror::Error;

@@ -37,15 +37,15 @@ use itertools::Itertools;
 /// the set { TransactionA } while the optimal solution is { TransactionB,
 /// TransactionC }.
 use num_rational::BigRational as FeeDensity;
-use nyks_protocol::consensus::block::Block;
-use nyks_protocol::consensus::mutator_set::addition_record::AdditionRecord;
-use nyks_protocol::consensus::mutator_set::removal_record::absolute_index_set::AbsoluteIndexSet;
-use nyks_protocol::consensus::transaction::transaction_kernel::TransactionKernel;
-use nyks_protocol::consensus::transaction::transaction_kernel_id::TransactionKernelId;
-use nyks_protocol::consensus::transaction::transaction_proof::TransactionProofQuality;
-use nyks_protocol::consensus::transaction::Transaction;
-use nyks_protocol::consensus::transaction::TransactionProof;
-use nyks_protocol::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::block::Block;
+use nyks_consensus::mutator_set::addition_record::AdditionRecord;
+use nyks_consensus::mutator_set::removal_record::absolute_index_set::AbsoluteIndexSet;
+use nyks_consensus::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::transaction::transaction_kernel::TransactionKernel;
+use nyks_consensus::transaction::transaction_kernel_id::TransactionKernelId;
+use nyks_consensus::transaction::transaction_proof::TransactionProofQuality;
+use nyks_consensus::transaction::Transaction;
+use nyks_consensus::transaction::TransactionProof;
 use priority_queue::DoublePriorityQueue;
 use tasm_lib::prelude::Digest;
 use tracing::debug;
@@ -836,7 +836,7 @@ impl Mempool {
     /// ```
     /// use bytesize::ByteSize;
     /// use nyks_node::application::config::network::Network;
-    /// use nyks_node::protocol::consensus::block::Block;
+    /// use nyks_node::protocol::block::Block;
     /// use nyks_node::state::mempool::Mempool;
     /// use nyks_node::state::transaction::tx_proving_capability::TxProvingCapability;
     ///

@@ -1,7 +1,7 @@
+use nyks_consensus::block::block_height::BlockHeight;
+use nyks_consensus::block::Block;
+use nyks_consensus::network::Network;
 use nyks_p2p::peer::synchronization_bit_mask::SynchronizationBitMask;
-use nyks_protocol::consensus::block::block_height::BlockHeight;
-use nyks_protocol::consensus::block::Block;
-use nyks_protocol::consensus::network::Network;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;

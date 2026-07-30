@@ -130,7 +130,7 @@ libp2p = { version = "0.56.0", features = [
     "yamux",
 ] }
 whoami = "2.0.0"
-nyks-protocol = { version = "0.8.0", path = "../protocol" }
+nyks-consensus = { version = "0.8.0", path = "../consensus" }
 nyks-p2p = { version = "0.8.0", path = "../p2p" }
 nyks-standards = { version = "0.8.0", path = "../standards" }
 nyks-rpc-core = { version = "0.8.0", path = "../rpc/core" }

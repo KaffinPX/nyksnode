@@ -5,16 +5,16 @@ use tasm_lib::prelude::Digest;
 use crate::model::common::RpcBFieldElements;
 use crate::model::common::RpcNativeCurrencyAmount;
 use crate::model::wallet::mutator_set::RpcMmrMembershipProof;
-use nyks_protocol::consensus::mutator_set::addition_record::AdditionRecord;
-use nyks_protocol::consensus::mutator_set::removal_record::RemovalRecord;
-use nyks_protocol::consensus::mutator_set::removal_record::absolute_index_set::AbsoluteIndexSet;
-use nyks_protocol::consensus::mutator_set::removal_record::chunk::Chunk;
-use nyks_protocol::consensus::mutator_set::removal_record::chunk_dictionary::ChunkDictionary;
-use nyks_protocol::consensus::transaction::announcement::Announcement;
-use nyks_protocol::consensus::transaction::transaction_kernel::TransactionKernel;
-use nyks_protocol::consensus::transaction::transaction_kernel::TransactionKernelProxy;
-use nyks_protocol::consensus::transaction::transaction_kernel_id::TransactionKernelId;
-use nyks_protocol::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::mutator_set::addition_record::AdditionRecord;
+use nyks_consensus::mutator_set::removal_record::RemovalRecord;
+use nyks_consensus::mutator_set::removal_record::absolute_index_set::AbsoluteIndexSet;
+use nyks_consensus::mutator_set::removal_record::chunk::Chunk;
+use nyks_consensus::mutator_set::removal_record::chunk_dictionary::ChunkDictionary;
+use nyks_consensus::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::transaction::announcement::Announcement;
+use nyks_consensus::transaction::transaction_kernel::TransactionKernel;
+use nyks_consensus::transaction::transaction_kernel::TransactionKernelProxy;
+use nyks_consensus::transaction::transaction_kernel_id::TransactionKernelId;
 
 pub type RpcAbsoluteIndexSet = AbsoluteIndexSet;
 

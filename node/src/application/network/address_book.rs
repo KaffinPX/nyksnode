@@ -17,7 +17,7 @@ use itertools::Itertools;
 use libp2p::Multiaddr;
 use libp2p::PeerId;
 use libp2p::StreamProtocol;
-use nyks_protocol::consensus::network::Network;
+use nyks_consensus::network::Network;
 use serde::Deserialize;
 use serde::Serialize;
 

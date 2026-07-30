@@ -1,6 +1,6 @@
-use nyks_protocol::consensus::block::Block;
-use nyks_protocol::consensus::network::Network;
-use nyks_protocol::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::block::Block;
+use nyks_consensus::network::Network;
+use nyks_consensus::proof_abstractions::timestamp::Timestamp;
 
 /// An abstract function to decide if one block is valid given its predecessor.
 ///

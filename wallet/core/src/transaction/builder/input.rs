@@ -3,11 +3,11 @@
 use std::ops::Deref;
 use std::ops::DerefMut;
 
-use nyks_protocol::consensus::mutator_set::ms_membership_proof::MsMembershipProof;
-use nyks_protocol::consensus::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
-use nyks_protocol::consensus::mutator_set::removal_record::RemovalRecord;
-use nyks_protocol::consensus::transaction::utxo::Utxo;
-use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
+use nyks_consensus::mutator_set::ms_membership_proof::MsMembershipProof;
+use nyks_consensus::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
+use nyks_consensus::mutator_set::removal_record::RemovalRecord;
+use nyks_consensus::transaction::utxo::Utxo;
+use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 use serde::Deserialize;
 use serde::Serialize;
 

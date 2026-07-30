@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use tasm_lib::prelude::Digest;
 
-use nyks_protocol::consensus::transaction::transaction_kernel::TransactionKernel;
-use nyks_protocol::proof_abstractions::mast_hash::MastHash;
+use nyks_consensus::proof_abstractions::mast_hash::MastHash;
+use nyks_consensus::transaction::transaction_kernel::TransactionKernel;
 
 /// Represents a mempool state change.
 ///

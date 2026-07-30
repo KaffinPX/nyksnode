@@ -1,13 +1,13 @@
 use anyhow::Result;
 use anyhow::bail;
 use anyhow::ensure;
-use nyks_protocol::consensus::block::Block;
-use nyks_protocol::consensus::block::BlockProof;
-use nyks_protocol::consensus::block::block_appendix::BlockAppendix;
-use nyks_protocol::consensus::block::block_body::BlockBody;
-use nyks_protocol::consensus::block::block_header::BlockHeader;
-use nyks_protocol::consensus::block::block_height::BlockHeight;
-use nyks_protocol::consensus::transaction::validity::neptune_proof::Proof;
+use nyks_consensus::block::Block;
+use nyks_consensus::block::BlockProof;
+use nyks_consensus::block::block_appendix::BlockAppendix;
+use nyks_consensus::block::block_body::BlockBody;
+use nyks_consensus::block::block_header::BlockHeader;
+use nyks_consensus::block::block_height::BlockHeight;
+use nyks_consensus::transaction::validity::nyks_proof::NyksProof;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -18,7 +18,7 @@ pub struct TransferBlock {
     pub header: BlockHeader,
     pub body: BlockBody,
     pub appendix: BlockAppendix,
-    pub proof: Proof,
+    pub proof: NyksProof,
 }
 
 impl TryFrom<TransferBlock> for Block {

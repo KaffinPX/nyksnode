@@ -1,8 +1,8 @@
-use nyks_protocol::consensus::block::Block;
-use nyks_protocol::consensus::block::block_height::BlockHeight;
-use nyks_protocol::consensus::block::difficulty_control::ProofOfWork;
-use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
-use nyks_protocol::proof_abstractions::mast_hash::MastHash;
+use nyks_consensus::block::Block;
+use nyks_consensus::block::block_height::BlockHeight;
+use nyks_consensus::block::difficulty_control::ProofOfWork;
+use nyks_consensus::proof_abstractions::mast_hash::MastHash;
+use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 use serde::Deserialize;
 use serde::Serialize;
 use tasm_lib::prelude::Digest;

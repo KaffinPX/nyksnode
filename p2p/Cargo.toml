@@ -22,7 +22,7 @@ libp2p = { version = "0.56.0", features = [] }
 arraystring = { version = "0.3.0", features = ["serde-traits"] }
 sha2 = "0.10.9"
 semver = "^1.0.23"
-nyks-protocol = { version = "0.8.0", path = "../protocol" }
+nyks-consensus = { version = "0.8.0", path = "../consensus" }
 
 [dev-dependencies]
 

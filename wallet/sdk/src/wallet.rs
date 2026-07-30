@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use nyks_protocol::consensus::block::block_height::BlockHeight;
-use nyks_protocol::consensus::network::Network;
-use nyks_protocol::consensus::transaction::Transaction;
-use nyks_protocol::consensus::transaction::transaction_kernel_id::TransactionKernelId;
-use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
-use nyks_protocol::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::block::block_height::BlockHeight;
+use nyks_consensus::network::Network;
+use nyks_consensus::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::transaction::Transaction;
+use nyks_consensus::transaction::transaction_kernel_id::TransactionKernelId;
+use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 use nyks_rpc_client::RpcApi;
 use nyks_rpc_client::RpcError;
 use nyks_rpc_client::http::HttpClient;

@@ -2,6 +2,8 @@ use tasm_lib::twenty_first::tip5::digest::Digest;
 
 use super::archival_mutator_set::ArchivalMutatorSet;
 use crate::util_types::archival_mmr::ArchivalMmr;
+use nyks_consensus::mutator_set::active_window::ActiveWindow;
+use nyks_consensus::mutator_set::removal_record::chunk::Chunk;
 use nyks_database::storage::storage_schema::traits::*;
 use nyks_database::storage::storage_schema::DbtSingleton;
 use nyks_database::storage::storage_schema::DbtVec;
@@ -9,8 +11,6 @@ use nyks_database::storage::storage_schema::RustyKey;
 use nyks_database::storage::storage_schema::RustyValue;
 use nyks_database::storage::storage_schema::SimpleRustyStorage;
 use nyks_database::NeptuneLevelDb;
-use nyks_protocol::consensus::mutator_set::active_window::ActiveWindow;
-use nyks_protocol::consensus::mutator_set::removal_record::chunk::Chunk;
 
 type AmsMmrStorage = DbtVec<Digest>;
 type AmsChunkStorage = DbtVec<Chunk>;

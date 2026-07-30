@@ -9,7 +9,7 @@ license = "Apache-2.0"
 repository = "https://github.com/Nyksnet/nyksnode/"
 
 [dependencies]
-nyks-protocol = { version = "0.8.0", path = "../../protocol" }
+nyks-consensus = { version = "0.8.0", path = "../../consensus" }
 nyks-standards = { version = "0.8.0", path = "../../standards" }
 nyks-wallet-core = { version = "0.8.0", path = "../core" }
 nyks-rpc-client = { version = "0.8.0", path = "../../rpc/client" }

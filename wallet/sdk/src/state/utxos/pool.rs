@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use num_traits::CheckedSub;
 use num_traits::Zero;
-use nyks_protocol::consensus::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
-use nyks_protocol::consensus::mutator_set::removal_record::absolute_index_set::AbsoluteIndexSet;
-use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
-use nyks_protocol::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
+use nyks_consensus::mutator_set::removal_record::absolute_index_set::AbsoluteIndexSet;
+use nyks_consensus::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 use nyks_rpc_client::RpcApi;
 use nyks_rpc_client::http::HttpClient;
 use nyks_rpc_client::wallet::mutator_set::RpcMsMembershipProofPrivacyPreserving;

@@ -4,7 +4,7 @@ use std::time::Duration;
 use anyhow::Result;
 use anyhow::bail;
 use clap::Parser;
-use nyks_protocol::consensus::network::Network;
+use nyks_consensus::network::Network;
 use nyks_rpc_client::http::HttpClient;
 use nyks_wallet_core::entropy::wallet_entropy::WalletEntropy;
 use nyks_wallet_sdk::wallet::Wallet;

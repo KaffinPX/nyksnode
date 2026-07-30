@@ -1,9 +1,9 @@
-use nyks_protocol::consensus::transaction::Transaction;
-use nyks_protocol::consensus::transaction::TransactionProof;
-use nyks_protocol::consensus::transaction::transaction_kernel::TransactionKernel;
-use nyks_protocol::consensus::transaction::transaction_proof::TransactionProofQuality;
-use nyks_protocol::consensus::transaction::validity::neptune_proof::Proof;
-use nyks_protocol::consensus::transaction::validity::proof_collection::ProofCollection;
+use nyks_consensus::transaction::Transaction;
+use nyks_consensus::transaction::TransactionProof;
+use nyks_consensus::transaction::transaction_kernel::TransactionKernel;
+use nyks_consensus::transaction::transaction_proof::TransactionProofQuality;
+use nyks_consensus::transaction::validity::nyks_proof::NyksProof;
+use nyks_consensus::transaction::validity::proof_collection::ProofCollection;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -16,7 +16,7 @@ use serde::Serialize;
 pub enum TransferTransactionProof {
     //OnlyLockScripts(OnlyLockScriptWitness) TODO: Add when Transaction supports
     ProofCollection(Box<ProofCollection>),
-    SingleProof(Proof),
+    SingleProof(NyksProof),
 }
 
 /// For transferring proved transactions between peers.

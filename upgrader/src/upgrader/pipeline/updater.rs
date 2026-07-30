@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use itertools::Itertools;
-use nyks_protocol::consensus::block::Block;
-use nyks_protocol::consensus::transaction::transaction_kernel::TransactionKernel;
-use nyks_protocol::consensus::transaction::transaction_kernel::TransactionKernelModifier;
-use nyks_protocol::consensus::transaction::validity::neptune_proof::Proof;
-use nyks_protocol::consensus::transaction::validity::single_proof::SingleProofWitness;
-use nyks_protocol::consensus::transaction::validity::tasm::single_proof::update_branch::UpdateWitness;
-use nyks_protocol::twenty_first::util_types::mmr::mmr_successor_proof::MmrSuccessorProof;
+use nyks_consensus::block::Block;
+use nyks_consensus::transaction::transaction_kernel::TransactionKernel;
+use nyks_consensus::transaction::transaction_kernel::TransactionKernelModifier;
+use nyks_consensus::transaction::validity::nyks_proof::NyksProof;
+use nyks_consensus::transaction::validity::single_proof::SingleProofWitness;
+use nyks_consensus::transaction::validity::tasm::single_proof::update_branch::UpdateWitness;
+use nyks_consensus::twenty_first::util_types::mmr::mmr_successor_proof::MmrSuccessorProof;
 use nyks_prover::JobCancelSender;
 use nyks_rpc_client::RpcApi;
 use nyks_rpc_client::block::transaction_kernel::RpcTransactionKernelId;
@@ -99,7 +99,7 @@ impl Updater {
         };
 
         let old_kernel: TransactionKernel = transaction.kernel.into();
-        let old_proof: Proof = proof.into();
+        let old_proof: NyksProof = proof.into();
 
         // Not tracked in active_task/the queue, so there's no way to cancel
         // this externally; keep the sender alive for the duration of the call.
@@ -119,7 +119,7 @@ impl Updater {
         info!("Starting updating mutator set of {}...", id);
 
         // 1. Snapshot the old transaction
-        let (old_kernel, old_proof): (TransactionKernel, Proof) = {
+        let (old_kernel, old_proof): (TransactionKernel, NyksProof) = {
             let mut transactions = self.transactions.write().await;
             let transaction = transactions.remove(&id)?;
 
@@ -151,9 +151,9 @@ impl Updater {
     async fn update_kernel_and_proof(
         &self,
         old_kernel: TransactionKernel,
-        old_proof: Proof,
+        old_proof: NyksProof,
         cancel_rx: watch::Receiver<()>,
-    ) -> Option<(TransactionKernel, Proof)> {
+    ) -> Option<(TransactionKernel, NyksProof)> {
         // Walk from tip backwards to find the block whose MSA matches the old kernel
         let tip_block: Block = self.client.tip().await.unwrap().block.into();
 

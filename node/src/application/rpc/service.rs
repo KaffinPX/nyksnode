@@ -2,12 +2,12 @@ use std::collections::HashSet;
 
 use async_trait::async_trait;
 use itertools::Itertools;
-use nyks_protocol::consensus::block::Block;
-use nyks_protocol::consensus::block::FUTUREDATING_LIMIT;
-use nyks_protocol::consensus::mutator_set::addition_record::AdditionRecord;
-use nyks_protocol::consensus::mutator_set::removal_record::absolute_index_set::AbsoluteIndexSet;
-use nyks_protocol::consensus::transaction::Transaction;
-use nyks_protocol::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::block::Block;
+use nyks_consensus::block::FUTUREDATING_LIMIT;
+use nyks_consensus::mutator_set::addition_record::AdditionRecord;
+use nyks_consensus::mutator_set::removal_record::absolute_index_set::AbsoluteIndexSet;
+use nyks_consensus::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::transaction::Transaction;
 use nyks_rpc_core::api::rpc::*;
 use nyks_rpc_core::model::block::header::TransactionKernelWithPriority;
 use nyks_rpc_core::model::block::RpcBlock;

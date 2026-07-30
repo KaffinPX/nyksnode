@@ -10,7 +10,7 @@ use regex::Regex;
 use super::ArchivalState;
 use crate::state::shared::BLOCK_FILENAME_EXTENSION;
 use crate::state::shared::BLOCK_FILENAME_PREFIX;
-use nyks_protocol::consensus::block::Block;
+use nyks_consensus::block::Block;
 
 impl ArchivalState {
     /// Return a list of file names found in a directory, unsorted.

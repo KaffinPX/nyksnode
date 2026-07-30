@@ -1,13 +1,13 @@
 use num_traits::Zero;
-use nyks_protocol::consensus::mutator_set::addition_record::AdditionRecord;
-use nyks_protocol::consensus::mutator_set::commit;
-use nyks_protocol::consensus::network::Network;
-use nyks_protocol::consensus::transaction::utxo::Coin;
-use nyks_protocol::consensus::transaction::utxo::Utxo;
-use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
-use nyks_protocol::tasm_lib::prelude::Digest;
-use nyks_protocol::tasm_lib::prelude::Tip5;
-use nyks_protocol::tasm_lib::twenty_first::bfe_array;
+use nyks_consensus::mutator_set::addition_record::AdditionRecord;
+use nyks_consensus::mutator_set::commit;
+use nyks_consensus::network::Network;
+use nyks_consensus::tasm_lib::prelude::Digest;
+use nyks_consensus::tasm_lib::prelude::Tip5;
+use nyks_consensus::tasm_lib::twenty_first::bfe_array;
+use nyks_consensus::transaction::utxo::Coin;
+use nyks_consensus::transaction::utxo::Utxo;
+use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 
 use crate::BFieldElement;
 use crate::wallet::keys::address::Address;
@@ -65,7 +65,7 @@ impl Allocations {
 
 #[cfg(test)]
 mod tests {
-    use nyks_protocol::consensus::block::Block;
+    use nyks_consensus::block::Block;
 
     use super::*;
 

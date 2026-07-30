@@ -2,9 +2,9 @@ use std::fmt;
 
 use tasm_lib::prelude::Digest;
 
-use nyks_protocol::consensus::block::block_height::BlockHeight;
-use nyks_protocol::consensus::block::Block;
-use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
+use nyks_consensus::block::block_height::BlockHeight;
+use nyks_consensus::block::Block;
+use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 
 /// A proposed block to extend the block chain with.
 ///

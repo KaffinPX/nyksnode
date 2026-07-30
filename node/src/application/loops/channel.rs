@@ -1,7 +1,7 @@
 use futures::channel::oneshot;
 use libp2p::Multiaddr;
-use nyks_protocol::consensus::block::Block;
-use nyks_protocol::consensus::transaction::Transaction;
+use nyks_consensus::block::Block;
+use nyks_consensus::transaction::Transaction;
 use tasm_lib::triton_vm::prelude::Digest;
 
 use crate::application::network::overview::NetworkOverview;

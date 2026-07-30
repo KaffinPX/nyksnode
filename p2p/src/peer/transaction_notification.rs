@@ -1,8 +1,8 @@
-use nyks_protocol::consensus::transaction::Transaction;
-use nyks_protocol::consensus::transaction::TransactionProof;
-use nyks_protocol::consensus::transaction::transaction_kernel_id::TransactionKernelId;
-use nyks_protocol::consensus::transaction::transaction_proof::TransactionProofQuality;
-use nyks_protocol::consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
+use nyks_consensus::transaction::Transaction;
+use nyks_consensus::transaction::TransactionProof;
+use nyks_consensus::transaction::transaction_kernel_id::TransactionKernelId;
+use nyks_consensus::transaction::transaction_proof::TransactionProofQuality;
+use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 use serde::Deserialize;
 use serde::Serialize;
 use tasm_lib::prelude::Digest;

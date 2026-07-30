@@ -1,4 +1,4 @@
-use nyks_protocol::consensus::network::Network;
+use nyks_consensus::network::Network;
 use nyks_standards::wallet::keys::address::Recipient;
 use nyks_wallet_core::entropy::wallet_entropy::WalletEntropy as Inner;
 use wasm_bindgen::prelude::*;

@@ -5,12 +5,12 @@ use serde::Deserialize;
 use serde::Serialize;
 use tasm_lib::twenty_first::tip5::digest::Digest;
 
+use nyks_consensus::block::block_header::BlockHeader;
+use nyks_consensus::block::block_header::HeaderToBlockHashWitness;
+use nyks_consensus::block::block_height::BlockHeight;
+use nyks_consensus::proof_abstractions::timestamp::Timestamp;
 use nyks_database::NeptuneLevelDb;
 use nyks_p2p::peer::PeerStanding;
-use nyks_protocol::consensus::block::block_header::BlockHeader;
-use nyks_protocol::consensus::block::block_header::HeaderToBlockHashWitness;
-use nyks_protocol::consensus::block::block_height::BlockHeight;
-use nyks_protocol::proof_abstractions::timestamp::Timestamp;
 
 pub const DATABASE_DIRECTORY_ROOT_NAME: &str = "databases";
 

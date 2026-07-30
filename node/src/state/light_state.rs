@@ -1,6 +1,6 @@
-use nyks_protocol::consensus::block::Block;
-use nyks_protocol::consensus::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
-use nyks_protocol::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::block::Block;
+use nyks_consensus::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
+use nyks_consensus::proof_abstractions::timestamp::Timestamp;
 
 /// LightState represents the latest accepted block,
 /// along with bookkeeping information about it
@@ -81,11 +81,11 @@ impl LightState {
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub(crate) mod tests {
     use super::*;
-    use nyks_protocol::consensus::block::block_appendix::BlockAppendix;
-    use nyks_protocol::consensus::block::block_header::BlockHeader;
-    use nyks_protocol::consensus::block::Block;
-    use nyks_protocol::consensus::block::BlockProof;
-    use nyks_protocol::consensus::network::Network;
+    use nyks_consensus::block::block_appendix::BlockAppendix;
+    use nyks_consensus::block::block_header::BlockHeader;
+    use nyks_consensus::block::Block;
+    use nyks_consensus::block::BlockProof;
+    use nyks_consensus::network::Network;
 
     #[test]
     fn update_works() {
