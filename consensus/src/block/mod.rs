@@ -731,14 +731,18 @@ impl Block {
             return true;
         }
 
-        let threshold = self.header().difficulty.target();
-        if network.allows_mock_pow() && self.is_valid_mock_pow(threshold) {
+        // Reject values that the difficulty control mechanism can never
+        // produce, rather than dividing by zero.
+        if self.header().difficulty < Difficulty::MINIMUM {
+            return false;
+        }
+
+        let target = self.header().difficulty.target();
+        if network.allows_mock_pow() && self.is_valid_mock_pow(target) {
             return true;
         }
 
-        let consensus_rule_set =
-            ConsensusRuleSet::infer_from(network, previous_block_header.height.next());
-        self.pow_verify(threshold, consensus_rule_set)
+        self.pow_verify(target)
     }
 
     /// Produce the MAST authentication paths for the `pow` field on
@@ -783,16 +787,11 @@ impl Block {
     }
 
     /// Verify that block digest is less than threshold and integral.
-    pub fn pow_verify(&self, target: Digest, consensus_rule_set: ConsensusRuleSet) -> bool {
+    pub fn pow_verify(&self, target: Digest) -> bool {
         let auth_paths = self.pow_mast_paths();
         self.header()
             .pow
-            .validate(
-                auth_paths,
-                target,
-                consensus_rule_set,
-                self.header().prev_block_digest,
-            )
+            .validate(auth_paths, target, self.header().prev_block_digest)
             .is_ok()
     }
 

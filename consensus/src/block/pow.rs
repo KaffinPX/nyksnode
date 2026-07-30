@@ -444,12 +444,8 @@ impl<const MERKLE_TREE_HEIGHT: usize> Pow<MERKLE_TREE_HEIGHT> {
         self,
         auth_paths: PowMastPaths,
         target: Digest,
-        consensus_rule_set: ConsensusRuleSet,
         parent_digest: Digest,
     ) -> Result<(), PowValidationError> {
-        let leaf_prefix = match consensus_rule_set {
-            ConsensusRuleSet::Launch => parent_digest,
-        };
         let index_picker_preimage = Tip5::hash_pair(self.root, auth_paths.commit());
         let (index_a, index_b) = Self::indices(index_picker_preimage, self.nonce);
 
@@ -463,8 +459,8 @@ impl<const MERKLE_TREE_HEIGHT: usize> Pow<MERKLE_TREE_HEIGHT> {
                 Self::MERKLE_TREE_HEIGHT as u32,
             ));
             (
-                Self::leaf(leaf_prefix, index_a),
-                Self::leaf(leaf_prefix, index_b),
+                Self::leaf(parent_digest, index_a),
+                Self::leaf(parent_digest, index_b),
             )
         };
 
