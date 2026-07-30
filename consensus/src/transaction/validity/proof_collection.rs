@@ -17,16 +17,16 @@ use crate::transaction::BFieldCodec;
 use crate::transaction::validity::collect_lock_scripts::CollectLockScripts;
 use crate::transaction::validity::collect_type_scripts::CollectTypeScripts;
 use crate::transaction::validity::kernel_to_outputs::KernelToOutputs;
-use crate::transaction::validity::neptune_proof::Proof;
+use crate::transaction::validity::nyks_proof::NyksProof;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, GetSize, BFieldCodec, TasmObject)]
 pub struct ProofCollection {
-    pub removal_records_integrity: Proof,
-    pub collect_lock_scripts: Proof,
-    pub lock_scripts_halt: Vec<Proof>,
-    pub kernel_to_outputs: Proof,
-    pub collect_type_scripts: Proof,
-    pub type_scripts_halt: Vec<Proof>,
+    pub removal_records_integrity: NyksProof,
+    pub collect_lock_scripts: NyksProof,
+    pub lock_scripts_halt: Vec<NyksProof>,
+    pub kernel_to_outputs: NyksProof,
+    pub collect_type_scripts: NyksProof,
+    pub type_scripts_halt: Vec<NyksProof>,
     pub lock_script_hashes: Vec<Digest>,
     pub type_script_hashes: Vec<Digest>,
     pub kernel_mast_hash: Digest,

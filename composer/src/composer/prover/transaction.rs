@@ -9,7 +9,7 @@ use nyks_consensus::proof_abstractions::tasm::program::TritonProgram;
 use nyks_consensus::proof_abstractions::timestamp::Timestamp;
 use nyks_consensus::transaction::Transaction;
 use nyks_consensus::transaction::TransactionProof;
-use nyks_consensus::transaction::validity::neptune_proof::Proof;
+use nyks_consensus::transaction::validity::nyks_proof::NyksProof;
 use nyks_consensus::transaction::validity::single_proof::SingleProof;
 use nyks_consensus::transaction::validity::single_proof::SingleProofWitness;
 use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
@@ -242,7 +242,7 @@ impl TransactionProver {
         claim: nyks_consensus::triton_vm::proof::Claim,
         nondeterminism: nyks_consensus::triton_vm::vm::NonDeterminism,
         rx: JobCancelReceiver,
-    ) -> Result<Proof, TransactionProverError> {
+    ) -> Result<NyksProof, TransactionProverError> {
         let job = ProverJob::new(
             SingleProof.program(),
             claim,

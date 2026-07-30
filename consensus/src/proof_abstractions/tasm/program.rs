@@ -7,7 +7,7 @@ use tasm_lib::triton_vm::error::InstructionError;
 use tasm_lib::triton_vm::error::ProvingError;
 use tasm_lib::triton_vm::prelude::*;
 
-use crate::transaction::validity::neptune_proof::Proof;
+use crate::transaction::validity::nyks_proof::NyksProof;
 
 #[derive(Debug, Clone)]
 pub enum TritonError {
@@ -51,7 +51,11 @@ where
     // The entire trait is only `pub` to facilitate benchmarks; it is not part of
     // the public API. The suppressed lints below are not nice, but I don't know
     // how else to make it work.
-    fn prove(&self, claim: Claim, nondeterminism: NonDeterminism) -> Result<Proof, ProvingError> {
+    fn prove(
+        &self,
+        claim: Claim,
+        nondeterminism: NonDeterminism,
+    ) -> Result<NyksProof, ProvingError> {
         triton_vm::prove(Stark::default(), &claim, self.program(), nondeterminism)
             .map(|proof| proof.into())
     }

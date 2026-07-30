@@ -30,7 +30,7 @@ use crate::proof_abstractions::tasm::program::TritonProgram;
 use crate::proof_abstractions::verifier::verify;
 use crate::transaction::transaction_kernel::TransactionKernel;
 use crate::transaction::transaction_kernel::TransactionKernelField;
-use crate::transaction::validity::neptune_proof::Proof;
+use crate::transaction::validity::nyks_proof::NyksProof;
 use crate::type_scripts::native_currency_amount::NativeCurrencyAmount;
 
 /// Verifies that all claims listed in the appendix are true.
@@ -53,7 +53,7 @@ impl BlockProgram {
     pub async fn verify(
         block_body: &BlockBody,
         appendix: &BlockAppendix,
-        proof: &Proof,
+        proof: &NyksProof,
         network: Network,
     ) -> bool {
         let claim = Self::claim(block_body, appendix);

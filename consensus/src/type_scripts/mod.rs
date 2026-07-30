@@ -21,7 +21,7 @@ use super::transaction::utxo::Coin;
 use crate::proof_abstractions::mast_hash::MastHash;
 use crate::proof_abstractions::tasm::program::TritonProgram;
 use crate::transaction::salted_utxos::SaltedUtxos;
-use crate::transaction::validity::neptune_proof::Proof;
+use crate::transaction::validity::nyks_proof::NyksProof;
 
 pub trait TypeScript: TritonProgram {
     type State: BFieldCodec;
@@ -101,7 +101,7 @@ impl TypeScriptAndWitness {
         txk_mast_hash: Digest,
         salted_inputs_hash: Digest,
         salted_outputs_hash: Digest,
-    ) -> Result<Proof, ProvingError> {
+    ) -> Result<NyksProof, ProvingError> {
         let input: Vec<_> = [txk_mast_hash, salted_inputs_hash, salted_outputs_hash]
             .into_iter()
             .flat_map(|d| d.reversed().values())

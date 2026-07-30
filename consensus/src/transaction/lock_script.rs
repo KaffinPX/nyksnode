@@ -12,8 +12,9 @@ use tasm_lib::twenty_first::math::b_field_element::BFieldElement;
 use tasm_lib::twenty_first::math::bfield_codec::BFieldCodec;
 use tasm_lib::twenty_first::tip5::digest::Digest;
 
+use crate::transaction::validity::nyks_proof::NyksProof;
+
 use super::utxo::Utxo;
-use crate::transaction::Proof;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, GetSize, BFieldCodec)]
 pub struct LockScript {
@@ -165,7 +166,7 @@ impl LockScriptAndWitness {
     }
 
     /// Assuming the lock script halts gracefully, prove it.
-    pub fn prove(&self, public_input: PublicInput) -> Result<Proof, ProvingError> {
+    pub fn prove(&self, public_input: PublicInput) -> Result<NyksProof, ProvingError> {
         let claim = Claim::new(self.program.hash()).with_input(public_input.individual_tokens);
         triton_vm::prove(
             Stark::default(),

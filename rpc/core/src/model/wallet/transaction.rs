@@ -8,20 +8,20 @@ use nyks_consensus::transaction::Transaction;
 use nyks_consensus::transaction::TransactionProof;
 use nyks_consensus::transaction::utxo::Coin;
 use nyks_consensus::transaction::utxo::Utxo;
-use nyks_consensus::transaction::validity::neptune_proof::NeptuneProof;
+use nyks_consensus::transaction::validity::nyks_proof::NyksProof;
 use nyks_consensus::transaction::validity::proof_collection::ProofCollection;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct RpcNeptuneProof(RpcBFieldElements);
+pub struct RpcNyksProof(RpcBFieldElements);
 
-impl From<NeptuneProof> for RpcNeptuneProof {
-    fn from(proof: NeptuneProof) -> Self {
+impl From<NyksProof> for RpcNyksProof {
+    fn from(proof: NyksProof) -> Self {
         Self(proof.0.clone().into())
     }
 }
 
-impl From<RpcNeptuneProof> for NeptuneProof {
-    fn from(proof: RpcNeptuneProof) -> NeptuneProof {
+impl From<RpcNyksProof> for NyksProof {
+    fn from(proof: RpcNyksProof) -> NyksProof {
         proof.0.0.into()
     }
 }
@@ -29,12 +29,12 @@ impl From<RpcNeptuneProof> for NeptuneProof {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct RpcProofCollection {
-    pub removal_records_integrity: RpcNeptuneProof,
-    pub collect_lock_scripts: RpcNeptuneProof,
-    pub lock_scripts_halt: Vec<RpcNeptuneProof>,
-    pub kernel_to_outputs: RpcNeptuneProof,
-    pub collect_type_scripts: RpcNeptuneProof,
-    pub type_scripts_halt: Vec<RpcNeptuneProof>,
+    pub removal_records_integrity: RpcNyksProof,
+    pub collect_lock_scripts: RpcNyksProof,
+    pub lock_scripts_halt: Vec<RpcNyksProof>,
+    pub kernel_to_outputs: RpcNyksProof,
+    pub collect_type_scripts: RpcNyksProof,
+    pub type_scripts_halt: Vec<RpcNyksProof>,
     pub lock_script_hashes: Vec<Digest>,
     pub type_script_hashes: Vec<Digest>,
     pub kernel_mast_hash: Digest,
@@ -85,7 +85,7 @@ impl From<ProofCollection> for RpcProofCollection {
 #[serde(untagged)]
 pub enum RpcTransactionProof {
     ProofCollection(Box<RpcProofCollection>),
-    SingleProof(RpcNeptuneProof),
+    SingleProof(RpcNyksProof),
 }
 
 impl From<RpcTransactionProof> for TransactionProof {

@@ -25,7 +25,7 @@ use crate::proof_abstractions::mast_hash::MastHash;
 use crate::proof_abstractions::tasm::program::TritonProgram;
 use crate::transaction::TransactionProof;
 use crate::transaction::transaction_kernel::TransactionKernelField;
-use crate::transaction::validity::neptune_proof::Proof;
+use crate::transaction::validity::nyks_proof::NyksProof;
 use crate::transaction::validity::single_proof::single_proof_claim;
 
 /// All information necessary to efficiently produce a proof for a block.
@@ -35,7 +35,7 @@ use crate::transaction::validity::single_proof::single_proof_claim;
 pub struct BlockProofWitness {
     pub(super) block_body: BlockBody,
     pub claims: Vec<Claim>,
-    pub proofs: Vec<Proof>,
+    pub proofs: Vec<NyksProof>,
 }
 
 impl BlockProofWitness {
@@ -48,7 +48,7 @@ impl BlockProofWitness {
     }
 
     /// Add a claim to the appendix, along with a proof.
-    fn with_claim(mut self, claim: Claim, proof: Proof) -> Self {
+    fn with_claim(mut self, claim: Claim, proof: NyksProof) -> Self {
         self.claims.push(claim);
         self.proofs.push(proof);
 
@@ -56,7 +56,7 @@ impl BlockProofWitness {
     }
 
     #[cfg(test)]
-    pub fn with_claim_test(self, claim: Claim, proof: Proof) -> Self {
+    pub fn with_claim_test(self, claim: Claim, proof: NyksProof) -> Self {
         self.with_claim(claim, proof)
     }
 

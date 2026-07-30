@@ -10,7 +10,7 @@ use crate::network::Network;
 use crate::proof_abstractions::verifier::verify;
 use crate::transaction::BFieldCodec;
 use crate::transaction::ProofCollection;
-use crate::transaction::validity::neptune_proof::NeptuneProof;
+use crate::transaction::validity::nyks_proof::NyksProof;
 use crate::transaction::validity::single_proof::single_proof_claim;
 
 /// Enumerates the kind of transaction proof that can be shared without the risk
@@ -70,7 +70,7 @@ impl TransactionProofType {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, GetSize, BFieldCodec)]
 pub enum TransactionProof {
     /// a strong proof.  required for confirming a transaction into a block.
-    SingleProof(NeptuneProof),
+    SingleProof(NyksProof),
     /// a weak proof that does not expose secrets. can be shared with peers, but cannot be confirmed into a block.
     ProofCollection(ProofCollection),
 }
@@ -89,7 +89,7 @@ impl TransactionProof {
     /// # Panics
     ///
     /// - If the proof type is any other than [TransactionProof::SingleProof].
-    pub fn into_single_proof(self) -> NeptuneProof {
+    pub fn into_single_proof(self) -> NyksProof {
         match self {
             TransactionProof::SingleProof(proof) => proof,
             TransactionProof::ProofCollection(_) => {
@@ -100,7 +100,7 @@ impl TransactionProof {
 
     /// Convert a transaction proof into a Triton VM proof, if the transaction
     /// is single proof backed. Otherwise returns `None`.
-    pub fn as_single_proof(&self) -> Option<NeptuneProof> {
+    pub fn as_single_proof(&self) -> Option<NyksProof> {
         match self {
             TransactionProof::ProofCollection(_) => None,
             TransactionProof::SingleProof(neptune_proof) => Some(neptune_proof.to_owned()),

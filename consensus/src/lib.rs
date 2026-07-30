@@ -2,6 +2,11 @@
 #![recursion_limit = "2048"]
 #![deny(clippy::shadow_unrelated)]
 
+pub use prelude::tasm_lib;
+pub use prelude::triton_vm;
+pub use prelude::twenty_first;
+pub use triton_vm::prelude::BFieldElement;
+
 pub mod block;
 pub mod consensus_rule_set;
 pub mod mutator_set;
@@ -10,11 +15,6 @@ pub mod prelude;
 pub mod proof_abstractions;
 pub mod transaction;
 pub mod type_scripts;
-
-pub use prelude::tasm_lib;
-pub use prelude::triton_vm;
-pub use prelude::twenty_first;
-pub use triton_vm::prelude::BFieldElement;
 
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]

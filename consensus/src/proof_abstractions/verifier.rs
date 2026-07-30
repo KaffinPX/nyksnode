@@ -4,7 +4,7 @@ use tasm_lib::triton_vm::stark::Stark;
 use tokio::task;
 
 use crate::network::Network;
-use crate::transaction::validity::neptune_proof::Proof;
+use crate::transaction::validity::nyks_proof::NyksProof;
 
 /// This claims-cache contains claims that are simply defined to be true.
 ///
@@ -47,7 +47,7 @@ static CLAIMS_CACHE_ENABLED: std::sync::LazyLock<tokio::sync::Mutex<bool>> =
 /// the verifier). When the test flag is set and the cache does not contain the
 /// claim and verification succeeds, the claim is added to the cache. The only
 /// other way to populate the cache is through method `cache_true_claim`.
-pub async fn verify(claim: Claim, proof: Proof, network: Network) -> bool {
+pub async fn verify(claim: Claim, proof: NyksProof, network: Network) -> bool {
     // security: we do not accept mock proofs unless we ourselves
     // are running a network that accepts mock-proofs, eg regtest.
     if network.use_mock_proof() {

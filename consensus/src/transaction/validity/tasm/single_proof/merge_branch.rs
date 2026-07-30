@@ -38,13 +38,13 @@ use crate::proof_abstractions::mast_hash::MastHash;
 use crate::proof_abstractions::tasm::program::TritonProgram;
 use crate::proof_abstractions::timestamp::Timestamp;
 use crate::transaction::BFieldCodec;
-use crate::transaction::Proof;
 use crate::transaction::Transaction;
 use crate::transaction::TransactionKernel;
 use crate::transaction::TransactionKernelProxy;
 use crate::transaction::TransactionProof;
 use crate::transaction::transaction_kernel::TransactionKernelField;
 use crate::transaction::transaction_kernel::TransactionKernelModifier;
+use crate::transaction::validity::nyks_proof::NyksProof;
 use crate::transaction::validity::single_proof::DISCRIMINANT_FOR_MERGE;
 use crate::transaction::validity::single_proof::SingleProof;
 use crate::transaction::validity::single_proof::SingleProofWitness;
@@ -65,8 +65,8 @@ pub struct MergeWitness {
 
     // This field, exceptionally, *CAN* contain packed `RemovalRecord`s.
     pub new_kernel: TransactionKernel,
-    pub left_proof: Proof,
-    pub right_proof: Proof,
+    pub left_proof: NyksProof,
+    pub right_proof: NyksProof,
 }
 
 impl MergeWitness {

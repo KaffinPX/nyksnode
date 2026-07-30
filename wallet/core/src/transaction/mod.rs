@@ -1,7 +1,7 @@
 use nyks_consensus::transaction::Transaction;
 use nyks_consensus::transaction::TransactionProof;
 use nyks_consensus::transaction::transaction_kernel::TransactionKernel;
-use nyks_consensus::transaction::validity::neptune_proof::NeptuneProof;
+use nyks_consensus::transaction::validity::nyks_proof::NyksProof;
 use nyks_consensus::transaction::validity::proof_collection::ProofCollection;
 use thiserror::Error;
 
@@ -17,7 +17,7 @@ pub mod utxo;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BuilderTransactionProof {
     /// A strong proof. required for confirming a transaction into a block.
-    SingleProof(NeptuneProof),
+    SingleProof(NyksProof),
     /// A weak proof that does not expose secrets. can be shared with peers, but cannot be confirmed into a block.
     ProofCollection(ProofCollection),
     /// A primitive-witness. exposes secrets (keys). this is not an actual proof and cannot be shared.

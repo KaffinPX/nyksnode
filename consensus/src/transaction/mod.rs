@@ -30,7 +30,6 @@ use self::transaction_kernel::TransactionKernel;
 use self::transaction_kernel::TransactionKernelProxy;
 use super::consensus_rule_set::ConsensusRuleSet;
 use crate::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
-use crate::transaction::validity::neptune_proof::Proof;
 use crate::triton_vm::proof::Claim;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, GetSize)]

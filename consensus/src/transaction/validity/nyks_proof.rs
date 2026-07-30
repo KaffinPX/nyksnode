@@ -38,11 +38,11 @@ enum MockProofBehavior {
 /// 2. valid-mock.    a mock proof that passes validation (if mock proofs are allowed)
 /// 3. invalid-mock.  a mock proof that fails validation (if mock proofs are allowed, or not)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, GetSize)]
-pub struct NeptuneProof {
+pub struct NyksProof {
     proof: VmProof,
 }
 
-impl BFieldCodec for NeptuneProof {
+impl BFieldCodec for NyksProof {
     type Error = <VmProof as BFieldCodec>::Error;
 
     fn decode(sequence: &[BFieldElement]) -> Result<Box<Self>, Self::Error> {
@@ -60,7 +60,7 @@ impl BFieldCodec for NeptuneProof {
     }
 }
 
-impl TasmObject for NeptuneProof {
+impl TasmObject for NyksProof {
     fn label_friendly_name() -> String {
         VmProof::label_friendly_name()
     }
@@ -80,7 +80,7 @@ impl TasmObject for NeptuneProof {
     }
 }
 
-impl Deref for NeptuneProof {
+impl Deref for NyksProof {
     type Target = VmProof;
 
     fn deref(&self) -> &Self::Target {
@@ -88,31 +88,31 @@ impl Deref for NeptuneProof {
     }
 }
 
-impl DerefMut for NeptuneProof {
+impl DerefMut for NyksProof {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.proof
     }
 }
 
-impl From<NeptuneProof> for VmProof {
-    fn from(mp: NeptuneProof) -> VmProof {
+impl From<NyksProof> for VmProof {
+    fn from(mp: NyksProof) -> VmProof {
         mp.proof
     }
 }
 
-impl From<Vec<BFieldElement>> for NeptuneProof {
+impl From<Vec<BFieldElement>> for NyksProof {
     fn from(v: Vec<BFieldElement>) -> Self {
         Self { proof: VmProof(v) }
     }
 }
 
-impl From<VmProof> for NeptuneProof {
+impl From<VmProof> for NyksProof {
     fn from(proof: VmProof) -> Self {
         Self { proof }
     }
 }
 
-impl NeptuneProof {
+impl NyksProof {
     /// creates an invalid standard proof (not a mock proof)
     pub fn invalid() -> Self {
         Self {
@@ -185,8 +185,3 @@ impl NeptuneProof {
         }
     }
 }
-
-// Proof is aliased to NeptuneProof this is done to avoid lots of diffs
-// wherever Proof is used.  we can remove this alias if/when code is updated to
-// use NeptuneProof directly
-pub type Proof = NeptuneProof;

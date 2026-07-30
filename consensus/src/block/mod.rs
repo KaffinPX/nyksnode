@@ -55,7 +55,7 @@ use crate::network::Network;
 use crate::proof_abstractions::mast_hash::HasDiscriminant;
 use crate::proof_abstractions::mast_hash::MastHash;
 use crate::proof_abstractions::timestamp::Timestamp;
-use crate::transaction::validity::neptune_proof::Proof;
+use crate::transaction::validity::nyks_proof::NyksProof;
 
 /// With removal records only represented by their absolute index set, the block
 /// size limit of 1.000.000 `BFieldElement`s allows for a "balanced" block
@@ -187,7 +187,7 @@ pub enum BlockProof {
     Genesis,
     #[default]
     Invalid,
-    SingleProof(Proof),
+    SingleProof(NyksProof),
 }
 
 /// Public fields of `Block` are read-only, enforced by #[readonly::make].

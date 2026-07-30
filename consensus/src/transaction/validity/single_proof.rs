@@ -1,9 +1,6 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-use crate::consensus_rule_set::ConsensusRuleSet;
-use crate::transaction::validity::neptune_proof::Proof;
-use crate::triton_vm::prelude::*;
 use itertools::Itertools;
 use tasm_lib::field;
 use tasm_lib::memory::FIRST_NON_DETERMINISTICALLY_INITIALIZED_MEMORY_ADDRESS;
@@ -16,12 +13,14 @@ use tasm_lib::twenty_first::error::BFieldCodecError;
 use tasm_lib::verifier::stark_verify::StarkVerify;
 
 use crate::BFieldElement;
+use crate::consensus_rule_set::ConsensusRuleSet;
 use crate::proof_abstractions::SecretWitness;
 use crate::proof_abstractions::mast_hash::MastHash;
 use crate::proof_abstractions::tasm::program::TritonProgram;
 use crate::transaction::Claim;
 use crate::transaction::transaction_kernel::TransactionKernel;
 use crate::transaction::transaction_kernel::TransactionKernelField;
+use crate::transaction::validity::nyks_proof::NyksProof;
 use crate::transaction::validity::proof_collection::ProofCollection;
 use crate::transaction::validity::tasm::claims::generate_collect_lock_scripts_claim::GenerateCollectLockScriptsClaim;
 use crate::transaction::validity::tasm::claims::generate_collect_type_scripts_claim::GenerateCollectTypeScriptsClaim;
@@ -31,6 +30,7 @@ use crate::transaction::validity::tasm::claims::generate_rri_claim::GenerateRriC
 use crate::transaction::validity::tasm::claims::generate_type_script_claim_template::GenerateTypeScriptClaimTemplate;
 use crate::transaction::validity::tasm::single_proof::merge_branch::MergeBranch;
 use crate::transaction::validity::tasm::single_proof::update_branch::UpdateBranch;
+use crate::triton_vm::prelude::*;
 
 use super::tasm::single_proof::merge_branch::MergeWitness;
 use super::tasm::single_proof::update_branch::UpdateWitness;
@@ -230,12 +230,12 @@ pub fn single_proof_claim(tx_kernel_mast_hash: Digest, _: ConsensusRuleSet) -> C
     SingleProof::claim(tx_kernel_mast_hash)
 }
 
-pub fn produce_single_proof_mock(valid_mock: bool) -> Proof {
+pub fn produce_single_proof_mock(valid_mock: bool) -> NyksProof {
     let claim = Claim::new(Digest::default());
     if valid_mock {
-        Proof::valid_mock(claim)
+        NyksProof::valid_mock(claim)
     } else {
-        Proof::invalid_mock(claim)
+        NyksProof::invalid_mock(claim)
     }
 }
 

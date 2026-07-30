@@ -6,7 +6,7 @@ use get_size2::GetSize;
 
 use crate::state::TransactionKernel;
 use nyks_consensus::transaction::transaction_kernel_id::TransactionKernelId;
-use nyks_consensus::transaction::validity::neptune_proof::NeptuneProof;
+use nyks_consensus::transaction::validity::nyks_proof::NyksProof;
 
 /// A transaction that was input to a merge of two transactions. In other words:
 /// either a or b in the operation merge(a, b) -> c, where a, b, and c are all
@@ -14,7 +14,7 @@ use nyks_consensus::transaction::validity::neptune_proof::NeptuneProof;
 #[derive(Debug, Clone, GetSize)]
 pub(super) struct MergeInputCacheElement {
     pub(super) tx_kernel: TransactionKernel,
-    pub(super) single_proof: NeptuneProof,
+    pub(super) single_proof: NyksProof,
 }
 
 /// The mempools cache of transactions that conflict with transactions in the
@@ -72,7 +72,7 @@ impl MergeInputCache {
         })
     }
 
-    pub(super) fn insert(&mut self, tx_kernel: TransactionKernel, single_proof: NeptuneProof) {
+    pub(super) fn insert(&mut self, tx_kernel: TransactionKernel, single_proof: NyksProof) {
         let txid = tx_kernel.txid();
         let cache_element = MergeInputCacheElement {
             tx_kernel,

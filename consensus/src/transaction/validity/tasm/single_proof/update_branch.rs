@@ -19,9 +19,9 @@ use tasm_lib::verifier::stark_verify::StarkVerify;
 use crate::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
 use crate::proof_abstractions::mast_hash::MastHash;
 use crate::transaction::BFieldCodec;
-use crate::transaction::Proof;
 use crate::transaction::TransactionKernel;
 use crate::transaction::transaction_kernel::TransactionKernelField;
+use crate::transaction::validity::nyks_proof::NyksProof;
 use crate::transaction::validity::single_proof::DISCRIMINANT_FOR_UPDATE;
 use crate::transaction::validity::tasm::authenticate_txk_field::AuthenticateTxkField;
 use crate::transaction::validity::tasm::claims::generate_single_proof_claim::GenerateSingleProofClaim;
@@ -39,7 +39,7 @@ pub struct UpdateWitness {
     pub new_kernel: TransactionKernel,
     pub old_kernel_mast_hash: Digest,
     pub new_kernel_mast_hash: Digest,
-    pub old_proof: Proof,
+    pub old_proof: NyksProof,
     pub new_swbfi_bagged: Digest,
     pub new_aocl: MmrAccumulator,
     pub new_swbfa_hash: Digest,
@@ -54,7 +54,7 @@ pub struct UpdateWitness {
 impl UpdateWitness {
     pub fn from_old_transaction(
         old_kernel: TransactionKernel,
-        old_proof: Proof,
+        old_proof: NyksProof,
         old_msa: MutatorSetAccumulator,
         new_kernel: TransactionKernel,
         new_msa: MutatorSetAccumulator,
