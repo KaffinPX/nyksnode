@@ -43,4 +43,4 @@ Requests are sent as a JSON POST body:
 }
 ```
 
-For the full list of RPC methods, see [`rpc/core/src/api/ops.rs`](rpc/core/src/api/ops.rs).
+For the full list of RPC methods, see [`rpc/core/src/api/ops.rs`](https://github.com/Nyksnet/node/blob/master/rpc/core/src/api/ops.rs).
