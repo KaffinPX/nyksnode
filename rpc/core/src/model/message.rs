@@ -25,7 +25,7 @@ pub struct NetworkRequest {}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NetworkResponse {
-    pub network: String,
+    pub network: RpcNetwork,
 }
 
 #[derive(Clone, Copy, Debug, Serialize_tuple, Deserialize_tuple)]
@@ -121,7 +121,7 @@ pub struct TipAnnouncementsResponse {
 #[derive(Clone, Copy, Debug, Serialize_tuple, Deserialize_tuple)]
 #[serde(rename_all = "camelCase")]
 pub struct GetBlockDigestRequest {
-    pub selector: RpcBlockSelector,
+    pub selector: BlockSelector,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -145,7 +145,7 @@ pub struct GetBlockDigestsResponse {
 #[derive(Clone, Copy, Debug, Serialize_tuple, Deserialize_tuple)]
 #[serde(rename_all = "camelCase")]
 pub struct GetBlockRequest {
-    pub selector: RpcBlockSelector,
+    pub selector: BlockSelector,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -157,7 +157,7 @@ pub struct GetBlockResponse {
 #[derive(Clone, Copy, Debug, Serialize_tuple, Deserialize_tuple)]
 #[serde(rename_all = "camelCase")]
 pub struct GetBlockProofRequest {
-    pub selector: RpcBlockSelector,
+    pub selector: BlockSelector,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -169,7 +169,7 @@ pub struct GetBlockProofResponse {
 #[derive(Clone, Copy, Debug, Serialize_tuple, Deserialize_tuple)]
 #[serde(rename_all = "camelCase")]
 pub struct GetBlockKernelRequest {
-    pub selector: RpcBlockSelector,
+    pub selector: BlockSelector,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -181,7 +181,7 @@ pub struct GetBlockKernelResponse {
 #[derive(Clone, Copy, Debug, Serialize_tuple, Deserialize_tuple)]
 #[serde(rename_all = "camelCase")]
 pub struct GetBlockHeaderRequest {
-    pub selector: RpcBlockSelector,
+    pub selector: BlockSelector,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -193,7 +193,7 @@ pub struct GetBlockHeaderResponse {
 #[derive(Clone, Copy, Debug, Serialize_tuple, Deserialize_tuple)]
 #[serde(rename_all = "camelCase")]
 pub struct GetBlockBodyRequest {
-    pub selector: RpcBlockSelector,
+    pub selector: BlockSelector,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -205,7 +205,7 @@ pub struct GetBlockBodyResponse {
 #[derive(Clone, Copy, Debug, Serialize_tuple, Deserialize_tuple)]
 #[serde(rename_all = "camelCase")]
 pub struct GetBlockTransactionKernelRequest {
-    pub selector: RpcBlockSelector,
+    pub selector: BlockSelector,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -217,7 +217,7 @@ pub struct GetBlockTransactionKernelResponse {
 #[derive(Clone, Copy, Debug, Serialize_tuple, Deserialize_tuple)]
 #[serde(rename_all = "camelCase")]
 pub struct GetBlockAnnouncementsRequest {
-    pub selector: RpcBlockSelector,
+    pub selector: BlockSelector,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
