@@ -30,7 +30,6 @@ pub mod util_types;
 use std::env;
 use std::path::PathBuf;
 
-use anyhow::Context;
 use anyhow::Result;
 use application::config::cli_args;
 use chrono::DateTime;
@@ -52,7 +51,6 @@ use tracing::warn;
 
 use crate::application::config::data_directory::DataDirectory;
 use crate::application::config::identity::resolve_identity;
-use crate::application::config::parser::multiaddr::multiaddr_to_socketaddr;
 use crate::application::loops::channel::RPCServerToMain;
 use crate::application::loops::main_loop::MainLoopHandler;
 use crate::application::loops::peer_loop::channel::MainToPeerTask;
@@ -102,6 +100,7 @@ pub async fn initialize(cli_args: cli_args::Args) -> Result<MainLoopHandler> {
         broadcast::channel::<MainToPeerTask>(PEER_CHANNEL_CAPACITY);
 
     // Add the MPSC (multi-producer, single consumer) channel for peer-task-to-main communication
+    // TODO: Think about other use cases and if theres none optimize/cleanup
     let (peer_task_to_main_tx, peer_task_to_main_rx) =
         mpsc::channel::<PeerTaskToMain>(PEER_CHANNEL_CAPACITY);
 
@@ -218,7 +217,6 @@ pub async fn initialize(cli_args: cli_args::Args) -> Result<MainLoopHandler> {
     Ok(MainLoopHandler::new(
         global_state_lock,
         main_to_peer_broadcast_tx,
-        peer_task_to_main_tx,
         network_command_tx,
         peer_task_to_main_rx,
         rpc_server_to_main_rx,

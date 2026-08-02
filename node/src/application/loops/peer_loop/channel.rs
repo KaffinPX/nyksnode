@@ -99,7 +99,6 @@ pub(crate) enum PeerTaskToMain {
 
     Transaction(Box<PeerTaskToMainTransaction>),
     BlockProposal(Box<Block>),
-    DisconnectFromLongestLivedPeer,
     NewSyncTarget(Box<Block>),
     NewSyncBlock(Box<Block>, PeerId),
     NewPeer(PeerId),
@@ -128,7 +127,6 @@ impl PeerTaskToMain {
             PeerTaskToMain::AddPeerMaxBlockHeight { .. } => "add peer max block height",
             PeerTaskToMain::Transaction(_) => "transaction",
             PeerTaskToMain::BlockProposal(_) => "block proposal",
-            PeerTaskToMain::DisconnectFromLongestLivedPeer => "disconnect from longest lived peer",
             PeerTaskToMain::NewSyncTarget(_block) => "new sync target",
             PeerTaskToMain::NewSyncBlock(_block, _socket_addr) => "new sync block",
             PeerTaskToMain::NewPeer { .. } => "new peer",

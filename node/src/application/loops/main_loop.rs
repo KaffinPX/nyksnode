@@ -1,29 +1,20 @@
 pub(crate) mod network_event_handler;
 
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::net::IpAddr;
-use std::net::SocketAddr;
-
-use std::sync::Arc;
 use std::time::Duration;
 use std::time::SystemTime;
 
 use anyhow::Result;
 use itertools::Either;
 use itertools::Itertools;
-use libp2p::PeerId;
 use nyks_consensus::block::Block;
-use nyks_p2p::peer::handshake_data::HandshakeData;
-use nyks_p2p::peer::peer_info::PeerInfo;
 use nyks_p2p::peer::transaction_notification::TransactionNotification;
 use rand::prelude::IteratorRandom;
-use tokio::net::TcpListener;
 use tokio::select;
 use tokio::signal;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
-use tokio::sync::Semaphore;
 use tokio::task::JoinHandle;
 use tokio::time;
 use tokio::time::Instant;
@@ -33,7 +24,6 @@ use tracing::error;
 use tracing::info;
 use tracing::warn;
 
-use crate::application::config::parser::multiaddr::multiaddr_to_socketaddr;
 use crate::application::loops::channel::RPCServerToMain;
 use crate::application::loops::peer_loop::channel::MainToPeerTask;
 use crate::application::loops::peer_loop::channel::PeerTaskToMain;
@@ -55,7 +45,6 @@ const PEER_DISCOVERY_INTERVAL: Duration = Duration::from_secs(2 * 60);
 const SYNC_REQUEST_INTERVAL: Duration = Duration::from_secs(3);
 const MEMPOOL_PRUNE_INTERVAL: Duration = Duration::from_secs(30 * 60);
 
-const POTENTIAL_PEER_MAX_COUNT_AS_A_FACTOR_OF_MAX_PEERS: usize = 20;
 pub(crate) const MAX_NUM_DIGESTS_IN_BATCH_REQUEST: usize = 200;
 
 /// MainLoop is the immutable part of the input for the main loop function
@@ -65,10 +54,6 @@ pub struct MainLoopHandler {
 
     // note: broadcast::Sender::send() does not block
     main_to_peer_broadcast_tx: broadcast::Sender<MainToPeerTask>,
-
-    // note: mpsc::Sender::send() blocks if channel full.
-    // locks should not be held across it.
-    peer_task_to_main_tx: mpsc::Sender<PeerTaskToMain>,
 
     network_command_tx: mpsc::Sender<NetworkActorCommand>,
 
@@ -107,7 +92,6 @@ impl MainLoopHandler {
     pub(crate) fn new(
         global_state_lock: GlobalStateLock,
         main_to_peer_broadcast_tx: broadcast::Sender<MainToPeerTask>,
-        peer_task_to_main_tx: mpsc::Sender<PeerTaskToMain>,
         network_command_tx: mpsc::Sender<NetworkActorCommand>,
 
         peer_task_to_main_rx: mpsc::Receiver<PeerTaskToMain>,
@@ -118,7 +102,6 @@ impl MainLoopHandler {
         Self {
             global_state_lock,
             main_to_peer_broadcast_tx,
-            peer_task_to_main_tx,
             network_command_tx,
 
             peer_task_to_main_rx,
@@ -450,32 +433,6 @@ impl MainLoopHandler {
                 // the previous proposal (as long as it is positive).
                 let pmsg = MainToPeerTask::BlockProposalNotification((&*block).into());
                 self.main_to_peer_broadcast(pmsg);
-            }
-            PeerTaskToMain::DisconnectFromLongestLivedPeer => {
-                let global_state = self.global_state_lock.lock_guard().await;
-
-                // get all peers
-                let all_peers = global_state.net.peer_map.iter();
-
-                // filter out CLI peers
-                let cli_peers = global_state.cli().peers.iter().collect::<HashSet<_>>();
-                let disconnect_candidates = all_peers
-                    .filter(|(_id, info)| !cli_peers.contains(&info.address()))
-                    .filter(|p| multiaddr_to_socketaddr(&p.1.address()).is_some());
-
-                // find the one with the oldest connection
-                let longest_lived_peer =
-                    disconnect_candidates.min_by(|(_, peer_info_left), (_, peer_info_right)| {
-                        peer_info_left
-                            .connection_established()
-                            .cmp(&peer_info_right.connection_established())
-                    });
-
-                // tell to disconnect
-                if let Some((peer_id, _peer_info)) = longest_lived_peer {
-                    let pmsg = MainToPeerTask::Disconnect(*peer_id);
-                    self.main_to_peer_broadcast(pmsg);
-                }
             }
             PeerTaskToMain::NewSyncTarget(new_target) => {
                 if let Some(sync_loop) = &mut main_loop_state.maybe_sync_loop {
