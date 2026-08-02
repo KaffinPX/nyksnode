@@ -117,17 +117,6 @@ pub struct NetworkingState {
     /// sent from this client, or accepted from peers.
     /// Only the RPC server may update this flag.
     pub freeze: bool,
-
-    /// Disconnection times of past peers. Can be used to determine if a connection
-    /// request should be accepted or rejected.
-    ///
-    /// Only records times of _graceful_ disconnections that were triggered by
-    /// _this_ node. That is, times of the following events are _not_ recorded:
-    /// - Graceful disconnect initiated by the peer.
-    /// - Abrupt disconnections, for example due to network failures.
-    ///
-    /// Only the peer tasks may update this map.
-    disconnection_times: HashMap<InstanceId, SystemTime>,
 }
 
 impl NetworkingState {
@@ -139,7 +128,6 @@ impl NetworkingState {
             sync_status: SyncStatus::Unknown,
             instance_id: rng().random(),
             freeze: false,
-            disconnection_times: HashMap::new(),
         }
     }
 
@@ -239,11 +227,7 @@ impl NetworkingState {
     /// - Abrupt disconnections, for example due to network failures.
     ///
     /// Only the peer tasks may call this method.
-    pub(crate) fn register_peer_disconnection(&mut self, id: InstanceId, time: SystemTime) {
-        self.disconnection_times.insert(id, time);
-    }
-
-    pub(crate) fn last_disconnection_time_of_peer(&self, id: InstanceId) -> Option<SystemTime> {
-        self.disconnection_times.get(&id).copied()
+    pub(crate) fn register_peer_disconnection(&mut self, _id: InstanceId, _time: SystemTime) {
+        // Retired: we do not hold disconnection times anymore... Kept to see if we can do anything else w this later
     }
 }
