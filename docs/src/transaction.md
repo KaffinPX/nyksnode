@@ -1,4 +1,4 @@
-# Transactions
+# Transaction
 
 On Nyks, transactions consist of 2 parts: the kernel and the proof.
 

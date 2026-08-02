@@ -1,0 +1,5 @@
+[book]
+authors = ["Nyksdevs"]
+language = "en"
+src = "src"
+title = "Nyks Docs"
