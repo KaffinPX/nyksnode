@@ -6,7 +6,7 @@ It's designed to support multiple transports, but only HTTP is supported for now
 
 ### Enabling
 
-RPC can be enabled with `--rpc-listen <ip>:<port>`.
+RPC can be enabled with `--listen-rpc <ip>:<port>` (default when the flag is given without a value: `127.0.0.1:9797`).
 
 Methods are grouped into namespaces, which can be individually exposed with `rpc-modules` using the same flag style. This lets you isolate which parts of the node are reachable over RPC, so you can expose only what you need instead of opening up everything.
 
@@ -43,4 +43,4 @@ Requests are sent as a JSON POST body:
 }
 ```
 
-For the full list of RPC methods, see [`rpc/core/src/api/ops.rs`](https://github.com/Nyksnet/node/blob/master/rpc/core/src/api/ops.rs).
+For the full list of RPC methods, see [`rpc/core/src/api/ops.rs`](https://github.com/nyksnet/node/blob/main/rpc/core/src/api/ops.rs).

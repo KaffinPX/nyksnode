@@ -15,7 +15,7 @@ Distribution of the block reward is determined by the composer.
 Typical PoW mining: a memory-heavy variant of Tip5 is used, and you search for a nonce that satisfies the block's target.
 
 Tip5's research paper can be found here: https://eprint.iacr.org/2023/107.pdf.
-Tip5 is also a crucial part of computing ZK proofs [zk.md](zk.md)), so giving miners an incentive to make it faster will probably be worth it in the long term.
+Tip5 is also a crucial part of computing ZK proofs ([zk.md](zk.md)), so giving miners an incentive to make it faster will probably be worth it in the long term.
 
 Miners choose whichever block template from a composer favors them most.
 
