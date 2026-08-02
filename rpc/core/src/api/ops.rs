@@ -15,7 +15,7 @@ use crate::model::message::*;
 /// Must be bumped every time a breaking change to the RPC API is made. Adding
 /// a new endpoint is not a breaking change. Neither is adding a new field to
 /// a type that is returned by this API.
-pub const RPC_API_VERSION: u16 = 2;
+pub const RPC_API_VERSION: u16 = 1;
 
 #[derive(
     Clone,

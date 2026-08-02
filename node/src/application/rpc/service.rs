@@ -52,7 +52,7 @@ async fn find_block_digest(selector: BlockSelector, state: &GlobalState) -> Opti
 impl RpcApi for RpcServer {
     async fn network_call(&self, _: NetworkRequest) -> RpcResult<NetworkResponse> {
         Ok(NetworkResponse {
-            network: self.state.cli().network.to_string(),
+            network: self.state.cli().network.into(),
         })
     }
 

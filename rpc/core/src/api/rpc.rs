@@ -12,7 +12,7 @@ use crate::model::block::header::RpcBlockPow;
 use crate::model::block::transaction_kernel::RpcAbsoluteIndexSet;
 use crate::model::block::transaction_kernel::RpcAdditionRecord;
 use crate::model::block::transaction_kernel::RpcTransactionKernelId;
-use crate::model::common::RpcBlockSelector;
+use crate::model::common::BlockSelector;
 use crate::model::json::JsonError;
 use crate::model::message::*;
 use crate::model::wallet::transaction::RpcTransaction;
@@ -159,10 +159,7 @@ pub trait RpcApi: Sync + Send {
         request: GetBlockDigestsRequest,
     ) -> RpcResult<GetBlockDigestsResponse>;
 
-    async fn get_block_digest(
-        &self,
-        selector: RpcBlockSelector,
-    ) -> RpcResult<GetBlockDigestResponse> {
+    async fn get_block_digest(&self, selector: BlockSelector) -> RpcResult<GetBlockDigestResponse> {
         self.get_block_digest_call(GetBlockDigestRequest { selector })
             .await
     }
@@ -171,15 +168,12 @@ pub trait RpcApi: Sync + Send {
         request: GetBlockDigestRequest,
     ) -> RpcResult<GetBlockDigestResponse>;
 
-    async fn get_block(&self, selector: RpcBlockSelector) -> RpcResult<GetBlockResponse> {
+    async fn get_block(&self, selector: BlockSelector) -> RpcResult<GetBlockResponse> {
         self.get_block_call(GetBlockRequest { selector }).await
     }
     async fn get_block_call(&self, request: GetBlockRequest) -> RpcResult<GetBlockResponse>;
 
-    async fn get_block_proof(
-        &self,
-        selector: RpcBlockSelector,
-    ) -> RpcResult<GetBlockProofResponse> {
+    async fn get_block_proof(&self, selector: BlockSelector) -> RpcResult<GetBlockProofResponse> {
         self.get_block_proof_call(GetBlockProofRequest { selector })
             .await
     }
@@ -188,10 +182,7 @@ pub trait RpcApi: Sync + Send {
         request: GetBlockProofRequest,
     ) -> RpcResult<GetBlockProofResponse>;
 
-    async fn get_block_kernel(
-        &self,
-        selector: RpcBlockSelector,
-    ) -> RpcResult<GetBlockKernelResponse> {
+    async fn get_block_kernel(&self, selector: BlockSelector) -> RpcResult<GetBlockKernelResponse> {
         self.get_block_kernel_call(GetBlockKernelRequest { selector })
             .await
     }
@@ -200,10 +191,7 @@ pub trait RpcApi: Sync + Send {
         request: GetBlockKernelRequest,
     ) -> RpcResult<GetBlockKernelResponse>;
 
-    async fn get_block_header(
-        &self,
-        selector: RpcBlockSelector,
-    ) -> RpcResult<GetBlockHeaderResponse> {
+    async fn get_block_header(&self, selector: BlockSelector) -> RpcResult<GetBlockHeaderResponse> {
         self.get_block_header_call(GetBlockHeaderRequest { selector })
             .await
     }
@@ -212,7 +200,7 @@ pub trait RpcApi: Sync + Send {
         request: GetBlockHeaderRequest,
     ) -> RpcResult<GetBlockHeaderResponse>;
 
-    async fn get_block_body(&self, selector: RpcBlockSelector) -> RpcResult<GetBlockBodyResponse> {
+    async fn get_block_body(&self, selector: BlockSelector) -> RpcResult<GetBlockBodyResponse> {
         self.get_block_body_call(GetBlockBodyRequest { selector })
             .await
     }
@@ -223,7 +211,7 @@ pub trait RpcApi: Sync + Send {
 
     async fn get_block_transaction_kernel(
         &self,
-        selector: RpcBlockSelector,
+        selector: BlockSelector,
     ) -> RpcResult<GetBlockTransactionKernelResponse> {
         self.get_block_transaction_kernel_call(GetBlockTransactionKernelRequest { selector })
             .await
@@ -235,7 +223,7 @@ pub trait RpcApi: Sync + Send {
 
     async fn get_block_announcements(
         &self,
-        selector: RpcBlockSelector,
+        selector: BlockSelector,
     ) -> RpcResult<GetBlockAnnouncementsResponse> {
         self.get_block_announcements_call(GetBlockAnnouncementsRequest { selector })
             .await

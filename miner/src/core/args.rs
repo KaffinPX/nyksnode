@@ -49,8 +49,7 @@ impl Args {
             .await
             .expect("Failed to connect to RPC node")
             .network
-            .parse::<Network>()
-            .unwrap();
+            .into();
 
         assert_eq!(
             self.network, remote_network,

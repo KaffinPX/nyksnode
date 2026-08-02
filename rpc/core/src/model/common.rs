@@ -3,6 +3,7 @@ use std::fmt::LowerHex;
 use std::str::FromStr;
 
 use nyks_consensus::block::block_height::BlockHeight;
+use nyks_consensus::network::Network;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
@@ -207,8 +208,35 @@ impl FromStr for BlockSelector {
     }
 }
 
-// TODO: cleanup...
-pub type RpcBlockSelector = BlockSelector;
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RpcNetwork(pub Network);
+
+impl From<Network> for RpcNetwork {
+    fn from(network: Network) -> Self {
+        RpcNetwork(network)
+    }
+}
+
+impl From<RpcNetwork> for Network {
+    fn from(network: RpcNetwork) -> Self {
+        network.0
+    }
+}
+
+impl Serialize for RpcNetwork {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.collect_str(&self.0)
+    }
+}
+
+impl<'de> Deserialize<'de> for RpcNetwork {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(d)?;
+        Network::from_str(&s)
+            .map(RpcNetwork)
+            .map_err(serde::de::Error::custom)
+    }
+}
 
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
