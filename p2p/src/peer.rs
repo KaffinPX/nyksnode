@@ -478,9 +478,6 @@ pub enum PeerMessage {
     /// Send a request that this node would like a copy of the transaction with
     /// digest as specified by the argument.
     TransactionRequest(TransactionKernelId),
-    PeerListRequest,
-    /// (socket address, instance_id)
-    PeerListResponse(Vec<(SocketAddr, u128)>),
     /// Inform peer that we are disconnecting them.
     Bye,
     ConnectionStatus(TransferConnectionStatus),
@@ -502,8 +499,6 @@ impl PeerMessage {
             PeerMessage::Transaction(_) => "send",
             PeerMessage::TransactionNotification(_) => "transaction notification",
             PeerMessage::TransactionRequest(_) => "transaction request",
-            PeerMessage::PeerListRequest => "peer list req",
-            PeerMessage::PeerListResponse(_) => "peer list resp",
             PeerMessage::Bye => "bye",
             PeerMessage::ConnectionStatus(_) => "connection status",
             PeerMessage::BlockProposalNotification(_) => "block proposal notification",
@@ -530,8 +525,6 @@ impl PeerMessage {
             PeerMessage::Transaction(_) => false,
             PeerMessage::TransactionNotification(_) => false,
             PeerMessage::TransactionRequest(_) => false,
-            PeerMessage::PeerListRequest => false,
-            PeerMessage::PeerListResponse(_) => false,
             PeerMessage::Bye => false,
             PeerMessage::ConnectionStatus(_) => false,
             PeerMessage::BlockProposalNotification(_) => false,
@@ -558,8 +551,6 @@ impl PeerMessage {
             PeerMessage::Transaction(_) => true,
             PeerMessage::TransactionNotification(_) => false,
             PeerMessage::TransactionRequest(_) => false,
-            PeerMessage::PeerListRequest => false,
-            PeerMessage::PeerListResponse(_) => false,
             PeerMessage::Bye => false,
             PeerMessage::ConnectionStatus(_) => false,
             PeerMessage::BlockProposalNotification(_) => true,
@@ -593,8 +584,6 @@ impl PeerMessage {
             PeerMessage::Transaction(_) => true,
             PeerMessage::TransactionNotification(_) => true,
             PeerMessage::TransactionRequest(_) => true,
-            PeerMessage::PeerListRequest => false,
-            PeerMessage::PeerListResponse(_) => false,
             PeerMessage::Bye => false,
             PeerMessage::ConnectionStatus(_) => false,
             PeerMessage::SyncCoverage(_) => true,

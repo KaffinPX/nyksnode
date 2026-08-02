@@ -10,7 +10,7 @@ use nyks_p2p::peer::PeerMessage;
 use tokio_util::codec::Framed;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 
-use crate::application::loops::connect_to_peers::get_codec_rules;
+use crate::application::network::codec::get_codec_rules;
 
 /// A transport-agnostic wrapper for peer communication.
 ///
