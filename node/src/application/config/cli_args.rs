@@ -523,7 +523,7 @@ mod tests {
 
     use num_traits::Zero;
 
-use super::*;
+    use super::*;
     use crate::application::config::parser::multiaddr::parse_to_multiaddr;
 
     #[test]
