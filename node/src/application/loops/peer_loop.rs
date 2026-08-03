@@ -106,7 +106,6 @@ pub struct PeerLoopHandler {
     peer_address: Multiaddr,
     peer_handshake_data: HandshakeData,
     inbound_connection: bool,
-    distance: u8,
     rng: StdRng,
     #[cfg(test)]
     mock_now: Option<Timestamp>,
@@ -120,7 +119,6 @@ impl PeerLoopHandler {
         peer_address: Multiaddr,
         peer_handshake_data: HandshakeData,
         inbound_connection: bool,
-        distance: u8,
     ) -> Self {
         Self {
             to_main_tx,
@@ -129,7 +127,6 @@ impl PeerLoopHandler {
             peer_address,
             peer_handshake_data,
             inbound_connection,
-            distance,
             rng: StdRng::from_rng(&mut rand::rng()),
             #[cfg(test)]
             mock_now: None,
@@ -146,7 +143,6 @@ impl PeerLoopHandler {
         peer_address: Multiaddr,
         peer_handshake_data: HandshakeData,
         inbound_connection: bool,
-        distance: u8,
         mocked_time: Timestamp,
     ) -> Self {
         Self {
@@ -156,7 +152,6 @@ impl PeerLoopHandler {
             peer_address,
             peer_handshake_data,
             inbound_connection,
-            distance,
             mock_now: Some(mocked_time),
             rng: StdRng::from_rng(&mut rand::rng()),
         }

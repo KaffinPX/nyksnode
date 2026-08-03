@@ -132,11 +132,7 @@ pub async fn initialize(cli_args: cli_args::Args) -> Result<MainLoopHandler> {
 
     // Set up the libp2p NetworkActor
     info!("Setting up Network Actor");
-    let cli_peers_for_network_actor = cli_args
-        .peers
-        .iter()
-        .cloned()
-        .collect_vec();
+    let cli_peers_for_network_actor = cli_args.peers.iter().cloned().collect_vec();
     let network_config = NetworkConfig::default()
         .with_subdirectory(data_directory.network_subdirectory())
         .with_network(cli_args.network)

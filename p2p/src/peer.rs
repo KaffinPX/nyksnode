@@ -7,7 +7,6 @@ pub mod transfer_block;
 pub mod transfer_transaction;
 
 use std::fmt::Display;
-use std::net::SocketAddr;
 use std::time::SystemTime;
 
 use handshake_data::HandshakeData;

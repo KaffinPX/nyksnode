@@ -23,7 +23,6 @@ use crate::BFieldElement;
 use crate::block::Block;
 use crate::block::block_header::BlockHeader;
 use crate::block::block_kernel::BlockKernel;
-use crate::consensus_rule_set::ConsensusRuleSet;
 use crate::proof_abstractions::mast_hash::MastHash;
 
 /// Determines the number of leafs in the Merkle tree in the guesser buffer.
