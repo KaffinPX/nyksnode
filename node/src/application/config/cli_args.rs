@@ -11,7 +11,6 @@ use clap::builder::TypedValueParser;
 use clap::Parser;
 use libp2p::multiaddr::Protocol;
 use libp2p::Multiaddr;
-use num_traits::Zero;
 use nyks_consensus::transaction::transaction_proof::TransactionProofQuality;
 use tracing::error;
 
@@ -169,10 +168,6 @@ pub struct Args {
     /// E.g. --max-mempool-size 500M
     #[clap(long, default_value = "1G", value_name = "SIZE")]
     pub(crate) max_mempool_size: ByteSize,
-
-    /// Port on which to listen for standard (AKA. legacy) TCP peer connections.
-    #[clap(long, default_value = "9798", value_name = "PORT")]
-    pub peer_port: u16,
 
     /// Port on which to listen for libp2p QUIC peer connections.
     #[clap(long, default_value = "9800", value_name = "PORT")]
@@ -357,21 +352,6 @@ impl Args {
         }
     }
 
-    /// Indicates if all incoming peer connections are disallowed.
-    pub(crate) fn disallow_all_incoming_peer_connections(&self) -> bool {
-        self.max_num_peers.is_zero()
-    }
-
-    /// Return the port that peer can connect on. None if incoming connections
-    /// are disallowed.
-    pub(crate) fn own_listen_port(&self) -> Option<u16> {
-        if self.disallow_all_incoming_peer_connections() {
-            None
-        } else {
-            Some(self.peer_port)
-        }
-    }
-
     /// Check if block proposal should be accepted from this IP address.
     pub(crate) fn accept_block_proposal_from(
         &self,
@@ -541,7 +521,9 @@ impl Args {
 mod tests {
     use std::net::Ipv6Addr;
 
-    use super::*;
+    use num_traits::Zero;
+
+use super::*;
     use crate::application::config::parser::multiaddr::parse_to_multiaddr;
 
     #[test]
@@ -550,20 +532,10 @@ mod tests {
 
         assert_eq!(1000, default_args.peer_tolerance);
         assert_eq!(10, default_args.max_num_peers);
-        assert_eq!(9798, default_args.peer_port);
         assert_eq!(
             IpAddr::from(Ipv6Addr::UNSPECIFIED),
             default_args.peer_listen_addr
         );
-    }
-
-    #[test]
-    fn max_peers_0_means_no_incoming_connections() {
-        let args = Args {
-            max_num_peers: 0,
-            ..Default::default()
-        };
-        assert!(args.disallow_all_incoming_peer_connections());
     }
 
     #[test]

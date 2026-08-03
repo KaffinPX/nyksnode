@@ -674,10 +674,8 @@ impl GlobalState {
     }
 
     pub(crate) fn get_own_handshakedata(&self) -> HandshakeData {
-        let listen_port = self.cli().own_listen_port();
         HandshakeData {
             tip_header: *self.chain.tip().header(),
-            listen_port,
             network: self.cli().network,
             instance_id: self.net.instance_id,
             version: VersionString::new_from_str(VERSION),

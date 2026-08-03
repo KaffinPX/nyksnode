@@ -12,18 +12,13 @@ use crate::peer::HandshakeData;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct PeerConnectionInfo {
-    listen_port: Option<u16>,
     address: Multiaddr,
     inbound: bool,
 }
 
 impl PeerConnectionInfo {
-    pub fn new(listen_port: Option<u16>, connected_address: Multiaddr, inbound: bool) -> Self {
-        Self {
-            listen_port,
-            address: connected_address,
-            inbound,
-        }
+    pub fn new(address: Multiaddr, inbound: bool) -> Self {
+        Self { address, inbound }
     }
 }
 
@@ -128,25 +123,6 @@ impl PeerInfo {
     /// note: the peer might not be honest.
     pub fn version(&self) -> &str {
         &self.version
-    }
-
-    /// Return the [`Multiaddr`] that the peer is expected to listen on. Returns
-    /// `None` if peer does not accept incoming connections.
-    pub fn listen_address(&self) -> Option<Multiaddr> {
-        let listen_port = self.peer_connection_info.listen_port?;
-        let mut new_multiaddr = Multiaddr::empty();
-
-        for component in &self.peer_connection_info.address {
-            match component {
-                // If TCP or UDP, replace the port with listen_port
-                Protocol::Tcp(_) => new_multiaddr.push(Protocol::Tcp(listen_port)),
-                Protocol::Udp(_) => new_multiaddr.push(Protocol::Udp(listen_port)),
-
-                // Otherwise, keep the component as is (IP, DNS, etc.)
-                other => new_multiaddr.push(other),
-            }
-        }
-        Some(new_multiaddr)
     }
 
     #[cfg(test)]

@@ -2120,11 +2120,8 @@ impl PeerLoopHandler {
         };
 
         // Add peer to peer map
-        let peer_connection_info = PeerConnectionInfo::new(
-            self.peer_handshake_data.listen_port,
-            self.peer_address.clone(),
-            self.inbound_connection,
-        );
+        let peer_connection_info =
+            PeerConnectionInfo::new(self.peer_address.clone(), self.inbound_connection);
         let new_peer = PeerInfo::new(
             peer_connection_info,
             &self.peer_handshake_data,
