@@ -118,7 +118,7 @@ impl PeerInfo {
         }
     }
 
-    /// returns the neptune-core version-string reported by the peer.
+    /// returns the nyks-node version-string reported by the peer.
     ///
     /// note: the peer might not be honest.
     pub fn version(&self) -> &str {

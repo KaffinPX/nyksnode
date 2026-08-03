@@ -766,7 +766,7 @@ impl ArchivalState {
             bincode::deserialize(&mmap).map_err(|e| {
                 anyhow::anyhow!(
                     "Failed to deserialize block from file {}. Data may be corrupt or incompatible\
-                     with current version of neptune-core. Error: {}",
+                     with current version of nyks-node. Error: {}",
                     block_file_path.display(), e
                 )
             })

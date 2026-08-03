@@ -7,8 +7,8 @@ version = "0.8.0"
 edition = "2021"
 license = "Apache-2.0"
 
-homepage = "https://neptune.cash/"
-repository = "https://github.com/Neptune-Crypto/neptune-core/"
+homepage = "https://nyks.tech/"
+repository = "https://github.com/Nyksnet/nyksnode/"
 
 [features]
 # locks::tokio support for tracking the location of lock acquisition.
