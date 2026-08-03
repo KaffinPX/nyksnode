@@ -30,7 +30,6 @@ pub mod util_types;
 use std::env;
 use std::path::PathBuf;
 
-use anyhow::Context;
 use anyhow::Result;
 use application::config::cli_args;
 use chrono::DateTime;
@@ -52,9 +51,7 @@ use tracing::warn;
 
 use crate::application::config::data_directory::DataDirectory;
 use crate::application::config::identity::resolve_identity;
-use crate::application::config::parser::multiaddr::multiaddr_to_socketaddr;
 use crate::application::loops::channel::RPCServerToMain;
-use crate::application::loops::connect_to_peers::call_peer;
 use crate::application::loops::main_loop::MainLoopHandler;
 use crate::application::loops::peer_loop::channel::MainToPeerTask;
 use crate::application::loops::peer_loop::channel::PeerTaskToMain;
@@ -69,10 +66,6 @@ use crate::state::GlobalStateLock;
 pub const SUCCESS_EXIT_CODE: i32 = 0;
 pub const COMPOSITION_FAILED_EXIT_CODE: i32 = 159;
 
-/// Magic string to ensure other program is Neptune Core
-/// TODO: move to protocol
-pub const MAGIC_STRING_REQUEST: &[u8; 15] = b"7B8AB7FC438F411";
-pub const MAGIC_STRING_RESPONSE: &[u8; 15] = b"Hello Neptune!\n";
 const PEER_CHANNEL_CAPACITY: usize = 1000;
 const RPC_CHANNEL_CAPACITY: usize = 1000;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -107,6 +100,7 @@ pub async fn initialize(cli_args: cli_args::Args) -> Result<MainLoopHandler> {
         broadcast::channel::<MainToPeerTask>(PEER_CHANNEL_CAPACITY);
 
     // Add the MPSC (multi-producer, single consumer) channel for peer-task-to-main communication
+    // TODO: Think about other use cases and if theres none optimize/cleanup
     let (peer_task_to_main_tx, peer_task_to_main_rx) =
         mpsc::channel::<PeerTaskToMain>(PEER_CHANNEL_CAPACITY);
 
@@ -138,13 +132,7 @@ pub async fn initialize(cli_args: cli_args::Args) -> Result<MainLoopHandler> {
 
     // Set up the libp2p NetworkActor
     info!("Setting up Network Actor");
-    let legacy_marker = libp2p::multiaddr::Protocol::Tcp(9798);
-    let cli_peers_for_network_actor = cli_args
-        .peers
-        .iter()
-        .filter(|addr| addr.iter().all(|p| p != legacy_marker))
-        .cloned()
-        .collect_vec();
+    let cli_peers_for_network_actor = cli_args.peers.iter().cloned().collect_vec();
     let network_config = NetworkConfig::default()
         .with_subdirectory(data_directory.network_subdirectory())
         .with_network(cli_args.network)
@@ -198,18 +186,6 @@ pub async fn initialize(cli_args: cli_args::Args) -> Result<MainLoopHandler> {
         }
     }
 
-    // Bind socket to port on this machine, to handle incoming connections from peers
-    let incoming_peer_listener = if let Some(incoming_peer_listener) = cli_args.own_listen_port() {
-        let ret = TcpListener::bind((cli_args.peer_listen_addr, incoming_peer_listener))
-           .await
-           .with_context(|| format!("Failed to bind to local TCP port {}:{}. Is an instance of this program already running?", cli_args.peer_listen_addr, incoming_peer_listener))?;
-        info!("Now listening for incoming peer-connections");
-        ret
-    } else {
-        info!("Not accepting incoming peer-connections");
-        TcpListener::bind("127.0.0.1:0").await?
-    };
-
     // Connect to peers, and provide each peer task with a thread-safe copy of the state
     let own_handshake_data: HandshakeData =
         global_state_lock.lock_guard().await.get_own_handshakedata();
@@ -217,38 +193,6 @@ pub async fn initialize(cli_args: cli_args::Args) -> Result<MainLoopHandler> {
         "Most known canonical block has height {}",
         own_handshake_data.tip_header.height
     );
-    let legacy_socketaddr = |multiaddr: &libp2p::Multiaddr| {
-        multiaddr_to_socketaddr(multiaddr).and_then(|sa| {
-            if [9800, 9801].contains(&sa.port()) {
-                None
-            } else {
-                Some(sa)
-            }
-        })
-    };
-    for multiaddress in &global_state_lock.cli().peers {
-        if let Some(peer_address) = legacy_socketaddr(multiaddress) {
-            let peer_state_var = global_state_lock.clone(); // bump arc refcount
-            let main_to_peer_broadcast_rx_clone: broadcast::Receiver<MainToPeerTask> =
-                main_to_peer_broadcast_tx.subscribe();
-            let peer_task_to_main_tx_clone: mpsc::Sender<PeerTaskToMain> =
-                peer_task_to_main_tx.clone();
-            let peer_join_handle = tokio::task::spawn(async move {
-                call_peer(
-                    peer_address,
-                    peer_state_var.clone(),
-                    main_to_peer_broadcast_rx_clone,
-                    peer_task_to_main_tx_clone,
-                    own_handshake_data,
-                    1, // All outgoing connections have distance 1
-                )
-                .await;
-            });
-            task_join_handles.push(peer_join_handle);
-        }
-        // Else: NetworkActor already got CLI peers via NetworkConfig.
-    }
-    debug!("Made outgoing connections to peers");
 
     // Start RPC server for CLI request and more. It's important that this is done as late
     // as possible, so requests do not hang while initialization code runs.
@@ -267,10 +211,8 @@ pub async fn initialize(cli_args: cli_args::Args) -> Result<MainLoopHandler> {
 
     // Handle incoming connections, messages from peer tasks, and messages from the mining task
     Ok(MainLoopHandler::new(
-        incoming_peer_listener,
         global_state_lock,
         main_to_peer_broadcast_tx,
-        peer_task_to_main_tx,
         network_command_tx,
         peer_task_to_main_rx,
         rpc_server_to_main_rx,

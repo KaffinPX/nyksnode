@@ -1,5 +1,3 @@
-use std::net::SocketAddr;
-
 use libp2p::Multiaddr;
 use libp2p::PeerId;
 use nyks_p2p::peer::peer_block_notifications::BlockProposalNotification;
@@ -25,12 +23,6 @@ pub(crate) enum MainToPeerTask {
 
     /// sanction a peer for failing to respond to sync request
     PeerSynchronizationTimeout(PeerId),
-
-    /// Request peer list from connected peers
-    MakePeerDiscoveryRequest,
-
-    /// Request peers from a specific peer to get peers further away
-    MakeSpecificPeerDiscoveryRequest(SocketAddr),
 
     /// Publish knowledge of a transaction
     TransactionNotification(TransactionNotification),
@@ -61,10 +53,6 @@ impl MainToPeerTask {
             MainToPeerTask::Block(_) => "block",
             MainToPeerTask::RequestBlockByHeight { .. } => "req block by height",
             MainToPeerTask::PeerSynchronizationTimeout(_) => "peer sync timeout",
-            MainToPeerTask::MakePeerDiscoveryRequest => "make peer discovery req",
-            MainToPeerTask::MakeSpecificPeerDiscoveryRequest(_) => {
-                "make specific peer discovery req"
-            }
             MainToPeerTask::TransactionNotification(_) => "transaction notification",
             MainToPeerTask::Disconnect(_) => "disconnect",
             MainToPeerTask::DisconnectAll() => "disconnect all",
@@ -84,8 +72,6 @@ impl MainToPeerTask {
             MainToPeerTask::BlockProposalNotification(_) => true,
             MainToPeerTask::RequestBlockByHeight { .. } => true,
             MainToPeerTask::PeerSynchronizationTimeout(_) => true,
-            MainToPeerTask::MakePeerDiscoveryRequest => false,
-            MainToPeerTask::MakeSpecificPeerDiscoveryRequest(_) => false,
             MainToPeerTask::TransactionNotification(_) => true,
             MainToPeerTask::Disconnect(_) => false,
             MainToPeerTask::DisconnectAll() => false,
@@ -111,12 +97,8 @@ pub(crate) enum PeerTaskToMain {
         claimed_block_digest: Digest,
     },
 
-    /// (\[(peer_listen_address)\], reported_by, distance)
-    PeerDiscoveryAnswer((Vec<(SocketAddr, u128)>, PeerId, u8)),
-
     Transaction(Box<PeerTaskToMainTransaction>),
     BlockProposal(Box<Block>),
-    DisconnectFromLongestLivedPeer,
     NewSyncTarget(Box<Block>),
     NewSyncBlock(Box<Block>, PeerId),
     NewPeer(PeerId),
@@ -143,10 +125,8 @@ impl PeerTaskToMain {
         match self {
             PeerTaskToMain::NewBlocks(_) => "new blocks",
             PeerTaskToMain::AddPeerMaxBlockHeight { .. } => "add peer max block height",
-            PeerTaskToMain::PeerDiscoveryAnswer(_) => "peer discovery answer",
             PeerTaskToMain::Transaction(_) => "transaction",
             PeerTaskToMain::BlockProposal(_) => "block proposal",
-            PeerTaskToMain::DisconnectFromLongestLivedPeer => "disconnect from longest lived peer",
             PeerTaskToMain::NewSyncTarget(_block) => "new sync target",
             PeerTaskToMain::NewSyncBlock(_block, _socket_addr) => "new sync block",
             PeerTaskToMain::NewPeer { .. } => "new peer",

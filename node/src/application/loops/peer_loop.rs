@@ -3,7 +3,6 @@ pub(crate) mod channel;
 use std::cmp;
 use std::marker::Unpin;
 use std::net::IpAddr;
-use std::net::SocketAddr;
 use std::time::SystemTime;
 
 use anyhow::bail;
@@ -56,8 +55,6 @@ use tracing::error;
 use tracing::info;
 use tracing::warn;
 
-use crate::application::config::parser::multiaddr::multiaddr_to_socketaddr;
-use crate::application::loops::connect_to_peers::close_peer_connected_callback;
 use crate::application::loops::main_loop::MAX_NUM_DIGESTS_IN_BATCH_REQUEST;
 use crate::application::loops::peer_loop::channel::MainToPeerTask;
 use crate::application::loops::peer_loop::channel::PeerTaskToMain;
@@ -71,7 +68,6 @@ use crate::state::GlobalState;
 use crate::state::GlobalStateLock;
 
 const STANDARD_BLOCK_BATCH_SIZE: usize = 35;
-const MAX_PEER_LIST_LENGTH: usize = 10;
 const MINIMUM_BLOCK_BATCH_SIZE: usize = 2;
 
 /// Maximum size in bytes for a single block during fork reconciliation. Blocks
@@ -110,7 +106,6 @@ pub struct PeerLoopHandler {
     peer_address: Multiaddr,
     peer_handshake_data: HandshakeData,
     inbound_connection: bool,
-    distance: u8,
     rng: StdRng,
     #[cfg(test)]
     mock_now: Option<Timestamp>,
@@ -124,7 +119,6 @@ impl PeerLoopHandler {
         peer_address: Multiaddr,
         peer_handshake_data: HandshakeData,
         inbound_connection: bool,
-        distance: u8,
     ) -> Self {
         Self {
             to_main_tx,
@@ -133,7 +127,6 @@ impl PeerLoopHandler {
             peer_address,
             peer_handshake_data,
             inbound_connection,
-            distance,
             rng: StdRng::from_rng(&mut rand::rng()),
             #[cfg(test)]
             mock_now: None,
@@ -150,7 +143,6 @@ impl PeerLoopHandler {
         peer_address: Multiaddr,
         peer_handshake_data: HandshakeData,
         inbound_connection: bool,
-        distance: u8,
         mocked_time: Timestamp,
     ) -> Self {
         Self {
@@ -160,7 +152,6 @@ impl PeerLoopHandler {
             peer_address,
             peer_handshake_data,
             inbound_connection,
-            distance,
             mock_now: Some(mocked_time),
             rng: StdRng::from_rng(&mut rand::rng()),
         }
@@ -617,66 +608,6 @@ impl PeerLoopHandler {
                 // but that this is done by the caller.
                 info!("Got bye. Closing connection to peer");
                 Ok(DISCONNECT_CONNECTION)
-            }
-            PeerMessage::PeerListRequest => {
-                let peer_info = {
-                    log_slow_scope!(fn_name!() + "::PeerMessage::PeerListRequest");
-
-                    // We are interested in the address on which peers accept ingoing connections,
-                    // not in the address in which they are connected to us. We are only interested in
-                    // peers that accept incoming connections.
-                    let mut peer_info: Vec<(SocketAddr, u128)> = self
-                        .global_state_lock
-                        .lock_guard()
-                        .await
-                        .net
-                        .peer_map
-                        .values()
-                        .filter(|peer_info| {
-                            peer_info.listen_address().is_some() && !peer_info.is_local_connection()
-                        })
-                        .take(MAX_PEER_LIST_LENGTH) // limit length of response
-                        .filter_map(|peer_info| {
-                            multiaddr_to_socketaddr(
-                                &peer_info
-                                    .listen_address()
-                                    .expect("already filtered for some listen address"),
-                            )
-                            .map(|socket_addr| (socket_addr, peer_info.instance_id()))
-                        })
-                        .collect();
-
-                    // We sort the returned list, so this function is easier to test
-                    peer_info.sort_by_cached_key(|x| x.0);
-                    peer_info
-                };
-
-                debug!("Responding with: {:?}", peer_info);
-                peer.send(PeerMessage::PeerListResponse(peer_info)).await?;
-                Ok(KEEP_CONNECTION_ALIVE)
-            }
-            PeerMessage::PeerListResponse(peers) => {
-                log_slow_scope!(fn_name!() + "::PeerMessage::PeerListResponse");
-
-                if peers.len() > MAX_PEER_LIST_LENGTH {
-                    self.punish(NegativePeerSanction::FloodPeerListResponse)
-                        .await?;
-                }
-
-                let peers = peers
-                    .into_iter()
-                    .filter(|(socket_addr, _)| !PeerInfo::ip_is_local(socket_addr.ip()))
-                    .collect();
-
-                self.to_main_tx
-                    .send(PeerTaskToMain::PeerDiscoveryAnswer((
-                        peers,
-                        self.peer_id,
-                        // The distance to the revealed peers is 1 + this peer's distance
-                        self.distance + 1,
-                    )))
-                    .await?;
-                Ok(KEEP_CONNECTION_ALIVE)
             }
             PeerMessage::BlockNotificationRequest => {
                 debug!("Got BlockNotificationRequest");
@@ -1972,10 +1903,6 @@ impl PeerLoopHandler {
                 // sanction, we don't disconnect.
                 Ok(KEEP_CONNECTION_ALIVE)
             }
-            MainToPeerTask::MakePeerDiscoveryRequest => {
-                peer.send(PeerMessage::PeerListRequest).await?;
-                Ok(KEEP_CONNECTION_ALIVE)
-            }
             MainToPeerTask::Disconnect(peer_id) => {
                 log_slow_scope!(fn_name!() + "::MainToPeerTask::Disconnect");
 
@@ -1996,14 +1923,6 @@ impl PeerLoopHandler {
                 self.register_peer_disconnection().await;
 
                 Ok(DISCONNECT_CONNECTION)
-            }
-            MainToPeerTask::MakeSpecificPeerDiscoveryRequest(target_socket_addr) => {
-                if let Some(socket_addr) = multiaddr_to_socketaddr(&self.peer_address) {
-                    if target_socket_addr == socket_addr {
-                        peer.send(PeerMessage::PeerListRequest).await?;
-                    }
-                }
-                Ok(KEEP_CONNECTION_ALIVE)
             }
             MainToPeerTask::TransactionNotification(transaction_notification) => {
                 debug!("Sending PeerMessage::TransactionNotification");
@@ -2201,11 +2120,8 @@ impl PeerLoopHandler {
         };
 
         // Add peer to peer map
-        let peer_connection_info = PeerConnectionInfo::new(
-            self.peer_handshake_data.listen_port,
-            self.peer_address.clone(),
-            self.inbound_connection,
-        );
+        let peer_connection_info =
+            PeerConnectionInfo::new(self.peer_address.clone(), self.inbound_connection);
         let new_peer = PeerInfo::new(
             peer_connection_info,
             &self.peer_handshake_data,
@@ -2324,5 +2240,77 @@ impl PeerLoopHandler {
             .await
             .net
             .register_peer_disconnection(peer_id, SystemTime::now());
+    }
+}
+
+/// Remove peer from state. This function must be called every time
+/// a peer is disconnected. Whether this happens through a panic
+/// in the peer task or through a regular disconnect.
+///
+/// TODO: make this part of handler?
+///
+/// Locking:
+///   * acquires `global_state_lock` for write
+pub(crate) async fn close_peer_connected_callback(
+    mut global_state_lock: GlobalStateLock,
+    peer_address: Multiaddr,
+    to_main_tx: &mpsc::Sender<PeerTaskToMain>,
+) {
+    let cli_arguments = global_state_lock.cli().clone();
+    let mut global_state_mut = global_state_lock.lock_guard_mut().await;
+
+    // Find the matching peer id
+    let Some(peer_id) = global_state_mut
+        .net
+        .peer_map
+        .iter()
+        .find(|(_peer_id, peer_info)| peer_info.address() == peer_address)
+        .map(|(peer_id, _)| peer_id)
+        .copied()
+    else {
+        error!("Could not find peer id for {peer_address}");
+        return;
+    };
+
+    // Store any new peer-standing to database
+    let peer_info_writeback = global_state_mut.net.peer_map.remove(&peer_id);
+    let new_standing = if let Some(new) = peer_info_writeback {
+        new.standing()
+    } else {
+        error!("Could not find peer standing for {peer_address}");
+        let mut standing = PeerStanding::new(cli_arguments.peer_tolerance);
+        let sanction = NegativePeerSanction::NoStandingFoundMaybeCrash;
+
+        // Don't return early: _must_ send message to main loop at the end of this
+        // function.
+        // If the peer has now reached bad standing, the connection to it should be
+        // dropped, which is currently happening anyway.
+        let _ = standing.sanction(PeerSanction::Negative(sanction));
+        standing
+    };
+    debug!("Fetched peer info standing {new_standing} for peer {peer_address}");
+
+    let maybe_ip = peer_address.iter().find_map(|p| match p {
+        Protocol::Ip4(ip) => Some(IpAddr::V4(ip)),
+        Protocol::Ip6(ip) => Some(IpAddr::V6(ip)),
+        _ => None,
+    });
+    if let Some(ip) = maybe_ip {
+        global_state_mut
+            .net
+            .write_peer_standing_on_decrease(ip, new_standing)
+            .await;
+    }
+
+    let sync_mode_is_active = global_state_mut.net.sync_anchor.is_some();
+    drop(global_state_mut); // avoid holding across mpsc::Sender::send()
+    debug!("Stored peer info standing {new_standing} for peer {peer_address}");
+
+    // If in sync mode, tell sync loop about dropped peer.
+    if sync_mode_is_active {
+        to_main_tx
+            .send(PeerTaskToMain::DroppedPeer(peer_id))
+            .await
+            .expect("channel to main should exist");
     }
 }

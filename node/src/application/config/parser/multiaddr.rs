@@ -32,27 +32,6 @@ pub(crate) fn parse_to_multiaddr(s: &str) -> Result<Multiaddr, MultiaddrParseErr
     Ok(socketaddr_to_multiaddr(socket_addr))
 }
 
-/// Converts a `Multiaddr` to a `SocketAddr` if possible. Useful when libp2p and
-/// the legacy P2P stack are used interchangeably.
-pub(crate) fn multiaddr_to_socketaddr(addr: &Multiaddr) -> Option<SocketAddr> {
-    let mut ip: Option<IpAddr> = None;
-    let mut port: Option<u16> = None;
-
-    for p in addr {
-        match p {
-            Protocol::Ip4(v4) => ip = Some(IpAddr::V4(v4)),
-            Protocol::Ip6(v6) => ip = Some(IpAddr::V6(v6)),
-            Protocol::Tcp(p) => port = Some(p),
-            _ => {}
-        }
-    }
-
-    match (ip, port) {
-        (Some(ip), Some(port)) => Some(SocketAddr::new(ip, port)),
-        _ => None,
-    }
-}
-
 /// Used in tests, but also in genesis_node.rs, which explains why this function
 /// and the module in which it is lived is marked `pub`.
 pub fn socketaddr_to_multiaddr(addr: SocketAddr) -> Multiaddr {
@@ -72,13 +51,6 @@ pub fn socketaddr_to_multiaddr(addr: SocketAddr) -> Multiaddr {
 
 #[cfg(test)]
 pub mod tests {
-
-    use std::net::SocketAddrV4;
-    use std::net::SocketAddrV6;
-
-    use proptest::prop_assert_eq;
-    use test_strategy::proptest;
-
     use super::*;
 
     #[test]
@@ -91,26 +63,5 @@ pub mod tests {
     fn can_convert_ips_to_multiadds() {
         assert!(parse_to_multiaddr("139.162.193.206").is_ok());
         assert!(parse_to_multiaddr("2001:bc8:17c0:41e:46a8:42ff:fe22:e8e9").is_ok());
-    }
-
-    #[proptest]
-    fn ipv4_multiaddr_round_trip_prop(ipv4: SocketAddrV4) {
-        let socket_addr = SocketAddr::from(ipv4);
-        let multiaddr = socketaddr_to_multiaddr(socket_addr);
-        let socket_address_again = multiaddr_to_socketaddr(&multiaddr).unwrap();
-        prop_assert_eq!(socket_addr, socket_address_again);
-    }
-
-    #[proptest]
-    fn ipv6_multiaddr_round_trip_prop(ipv6: SocketAddrV6) {
-        let socket_addr = SocketAddr::from(ipv6);
-        let multiaddr = socketaddr_to_multiaddr(socket_addr);
-        let socket_address_again = multiaddr_to_socketaddr(&multiaddr).unwrap();
-
-        // Only compare ip + port
-        prop_assert_eq!(socket_addr.ip(), socket_address_again.ip());
-        prop_assert_eq!(socket_addr.port(), socket_address_again.port());
-
-        // (Scope ID is ignored.)
     }
 }

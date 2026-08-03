@@ -81,7 +81,6 @@ pub type ExtraDataString = ArrayString<U255>;
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HandshakeData {
     pub tip_header: BlockHeader,
-    pub listen_port: Option<u16>,
     pub network: Network,
     pub instance_id: u128,
     pub version: VersionString,

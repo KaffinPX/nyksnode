@@ -968,6 +968,32 @@ impl NetworkActor {
                 connection_id,
                 ..
             } => {
+                let address = endpoint.get_remote_address().clone();
+
+                // Update sticky-peer state unconditionally: even if this connection
+                // turns out to be a duplicate (and gets ignored below), it still
+                // proves the peer at this Multiaddr is alive and reachable. If we
+                // don't do this here, a sticky peer's state can get stuck in
+                // `Dialing` forever whenever a race lets some other connection to the
+                // same peer_id land first (e.g. an inbound dial, or a Kademlia-driven
+                // connection), even though we are clearly talking to it.
+                if self.sticky_peers.contains_key(&address) {
+                    self.sticky_peers.entry(address.clone()).and_modify(|p| {
+                    match p {
+                            StickyPeer::None | StickyPeer::Dialing(_) => {
+                                tracing::debug!(%peer_id, "Found peer id of sticky peer {address}.");
+                                *p = StickyPeer::Connected(peer_id);
+                            }
+                            StickyPeer::Connected(pid) => {
+                                if *pid != peer_id {
+                                    tracing::debug!(%peer_id, "Found *new* peer id of sticky peer {address}.");
+                                    *pid = peer_id;
+                                }
+                            }
+                        }
+                    });
+                }
+
                 // Gatekeep: one connection per peer.
                 // We allow the duplicate connection to remain because libp2p
                 // deals with that and we do not want to interfere with that
@@ -979,8 +1005,6 @@ impl NetworkActor {
                     );
                     return Ok(());
                 }
-
-                let address = endpoint.get_remote_address().clone();
 
                 // Check for banned IPs again. The catch above in
                 // `IncomingConnection` is a good first filter but because of
@@ -2123,10 +2147,6 @@ impl NetworkActor {
         raw_stream: libp2p::Stream,
         from_main_rx: tokio::sync::broadcast::Receiver<MainToPeerTask>,
     ) -> Option<JoinHandle<()>> {
-        // Counts the number of hops between the node and peers it is connected
-        // to. We probably don't need this for the libp2p wrapper.
-        const DISTANCE_TO_CONNECTED_PEER: u8 = 1u8;
-
         // Keep track of which peers get upgraded connections. Prevent same
         // peer from getting upgraded multiple times.
         let num_upgraded_peers = {
@@ -2159,7 +2179,6 @@ impl NetworkActor {
             peer_address,
             remote_handshake,
             rand::rng().random_bool(0.5f64),
-            DISTANCE_TO_CONNECTED_PEER,
         );
 
         let peer_stream = bridge_libp2p_stream(raw_stream);
