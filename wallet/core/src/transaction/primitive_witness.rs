@@ -2,12 +2,19 @@ use std::collections::HashMap;
 use std::fmt::Display;
 
 use itertools::Itertools;
+use nyks_consensus::block::mutator_set_update::MutatorSetUpdate;
+use nyks_consensus::mutator_set::authenticated_item::AuthenticatedItem;
+use nyks_consensus::mutator_set::ms_membership_proof::MsMembershipProof;
+use nyks_consensus::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
+use nyks_consensus::mutator_set::removal_record::RemovalRecord;
 use nyks_consensus::prelude::tasm_lib::prelude::Tip5;
 use nyks_consensus::proof_abstractions::SecretWitness;
+use nyks_consensus::proof_abstractions::mast_hash::MastHash;
 use nyks_consensus::proof_abstractions::tasm::program::TritonProgram;
 use nyks_consensus::tasm_lib::prelude::Digest;
 use nyks_consensus::transaction::lock_script::LockScriptAndWitness;
 use nyks_consensus::transaction::salted_utxos::SaltedUtxos;
+use nyks_consensus::transaction::transaction_kernel::TransactionKernel;
 use nyks_consensus::transaction::transaction_kernel::TransactionKernelField;
 use nyks_consensus::transaction::transaction_kernel::TransactionKernelModifier;
 use nyks_consensus::transaction::utxo::Utxo;
@@ -24,27 +31,20 @@ use nyks_consensus::triton_vm::error::ProvingError;
 use nyks_consensus::triton_vm::prelude::BFieldCodec;
 use nyks_consensus::triton_vm::vm::PublicInput;
 use nyks_consensus::triton_vm::vm::VM;
+use nyks_consensus::type_scripts::TypeScriptAndWitness;
+use nyks_consensus::type_scripts::known_type_scripts;
+use nyks_consensus::type_scripts::known_type_scripts::match_type_script_and_generate_witness;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 use serde::Deserialize;
 use serde::Serialize;
 use thiserror::Error;
 use tracing::info;
+use tracing::warn;
 
 use crate::transaction::BuilderTransaction;
 use crate::transaction::BuilderTransactionProof;
 use crate::transaction::builder::input::TxInputList;
-use nyks_consensus::block::mutator_set_update::MutatorSetUpdate;
-use nyks_consensus::mutator_set::authenticated_item::AuthenticatedItem;
-use nyks_consensus::mutator_set::ms_membership_proof::MsMembershipProof;
-use nyks_consensus::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
-use nyks_consensus::mutator_set::removal_record::RemovalRecord;
-use nyks_consensus::proof_abstractions::mast_hash::MastHash;
-use nyks_consensus::transaction::transaction_kernel::TransactionKernel;
-use nyks_consensus::type_scripts::TypeScriptAndWitness;
-use nyks_consensus::type_scripts::known_type_scripts;
-use nyks_consensus::type_scripts::known_type_scripts::match_type_script_and_generate_witness;
-use tracing::warn;
 
 /// enumerates possible witness validation errors
 #[derive(Debug, Clone, Error, Serialize, Deserialize)]
