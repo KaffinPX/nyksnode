@@ -39,7 +39,6 @@ use rand::rngs::StdRng;
 use serde::Deserialize;
 use serde::Serialize;
 use thiserror::Error;
-use tracing::info;
 use tracing::warn;
 
 use crate::transaction::BuilderTransaction;
@@ -91,10 +90,6 @@ pub enum WitnessValidationError {
 
     #[error("Primitive-witness backed transaction cannot have a set merge bit")]
     MergeBitSet,
-
-    // catch-all error, eg for anyhow errors
-    #[error("transaction could not be created.  reason: {0}")]
-    Failed(String),
 }
 
 /// Identifies which sub-proof is being generated.
@@ -262,6 +257,12 @@ impl PrimitiveWitness {
     /// Verify the transaction directly from primitive witness
     ///
     /// (without proofs or decomposing into subclaims).
+    ///
+    /// # Panics
+    /// Panics if a spawned blocking task for lock- or type-script
+    /// verification fails to run to completion (e.g. it panicked). This
+    /// indicates a bug in the VM or runtime rather than an invalid witness,
+    /// so it is not represented as a [`WitnessValidationError`].
     #[cfg(not(target_arch = "wasm32"))]
     pub async fn validate(&self) -> Result<(), WitnessValidationError> {
         for lock_script_and_witness in &self.lock_scripts_and_witnesses {
@@ -272,17 +273,11 @@ impl PrimitiveWitness {
             // This could be a lengthy, CPU intensive call.
             // Also, the lock script is satisfied if it halts gracefully (i.e., without crashing).
             // The output is irrelevant.
-            let result = tokio::task::spawn_blocking(move || {
+            let run_res = tokio::task::spawn_blocking(move || {
                 VM::run(lock_script.clone(), public_input, secret_input)
             })
-            .await;
-
-            let Ok(run_res) = result else {
-                let reason = "Failed to spawn task for verifying lock script.";
-                let error = WitnessValidationError::Failed(reason.into());
-                warn!("{}", error);
-                return Err(error);
-            };
+            .await
+            .expect("spawned task for verifying lock script should not panic");
 
             if let Err(_e) = run_res {
                 // tbd: should we include the VMerror in InvalidLockScript error?
@@ -374,17 +369,11 @@ impl PrimitiveWitness {
 
             // Like above: potentially lengthy, CPU intensive call, only thing that matters
             // is error-free completion.
-            let result = tokio::task::spawn_blocking(move || {
+            let run_res = tokio::task::spawn_blocking(move || {
                 VM::run(type_script, public_input, nondeterminism)
             })
-            .await;
-
-            let Ok(run_res) = result else {
-                let reason = "Failed to spawn task for verifying type script.";
-                let error = WitnessValidationError::Failed(reason.into());
-                warn!("{}", error);
-                return Err(error);
-            };
+            .await
+            .expect("spawned task for verifying type script should not panic");
 
             if let Err(vm_error) = run_res {
                 // tbd: should we include the VMError in InvalidTypeScript error?
@@ -523,8 +512,6 @@ impl PrimitiveWitness {
         let txk_mast_hash_as_input = PublicInput::new(txk_mast_hash.reversed().values().to_vec());
         let salted_inputs_hash = Tip5::hash(&self.input_utxos);
         let salted_outputs_hash = Tip5::hash(&self.output_utxos);
-
-        info!("Starting proving of {:x}...", txk_mast_hash);
 
         on_progress(ProvingStage::RemovalRecordsIntegrity);
         let removal_records_integrity = RemovalRecordsIntegrity.prove(
