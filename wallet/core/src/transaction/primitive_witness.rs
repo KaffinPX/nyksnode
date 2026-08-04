@@ -97,6 +97,45 @@ pub enum WitnessValidationError {
     Failed(String),
 }
 
+/// Identifies which sub-proof is being generated.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProvingStage {
+    RemovalRecordsIntegrity,
+    CollectLockScripts,
+    KernelToOutputs,
+    CollectTypeScripts,
+    LockScript {
+        index: usize,
+        total: usize,
+        program_hash: Digest,
+    },
+    TypeScript {
+        index: usize,
+        total: usize,
+        program_hash: Digest,
+        name: String,
+    },
+}
+
+impl Display for ProvingStage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ProvingStage::RemovalRecordsIntegrity => write!(f, "RemovalRecordsIntegrity"),
+            ProvingStage::CollectLockScripts => write!(f, "CollectLockScripts"),
+            ProvingStage::KernelToOutputs => write!(f, "KernelToOutputs"),
+            ProvingStage::CollectTypeScripts => write!(f, "CollectTypeScripts"),
+            ProvingStage::LockScript { index, total, .. } => {
+                write!(f, "Lock script {}/{}", index + 1, total)
+            }
+            ProvingStage::TypeScript {
+                index, total, name, ..
+            } => {
+                write!(f, "Type script {}/{} ({name})", index + 1, total)
+            }
+        }
+    }
+}
+
 /// The raw witness is the most primitive type of transaction witness.
 /// It exposes secret data and is therefore not for broadcasting.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, BFieldCodec)]
@@ -464,29 +503,14 @@ impl PrimitiveWitness {
         primitive_witness
     }
 
-    fn extract_specific_witnesses(
-        &self,
-    ) -> (
-        RemovalRecordsIntegrityWitness,
-        CollectLockScriptsWitness,
-        KernelToOutputsWitness,
-        CollectTypeScriptsWitness,
-    ) {
-        // collect witnesses
-        let removal_records_integrity_witness = RemovalRecordsIntegrityWitness::from(self);
-        let collect_lock_scripts_witness = CollectLockScriptsWitness::from(self);
-        let kernel_to_outputs_witness = KernelToOutputsWitness::from(self);
-        let collect_type_scripts_witness = CollectTypeScriptsWitness::from(self);
-
-        (
-            removal_records_integrity_witness,
-            collect_lock_scripts_witness,
-            kernel_to_outputs_witness,
-            collect_type_scripts_witness,
-        )
+    pub fn prove(&self) -> Result<ProofCollection, ProvingError> {
+        self.prove_with_progress(|_| {})
     }
 
-    pub fn prove(&self) -> Result<ProofCollection, ProvingError> {
+    pub fn prove_with_progress(
+        &self,
+        mut on_progress: impl FnMut(ProvingStage),
+    ) -> Result<ProofCollection, ProvingError> {
         // TODO: potentially add a way to show progress of proving...
         let (
             removal_records_integrity_witness,
@@ -501,41 +525,54 @@ impl PrimitiveWitness {
         let salted_outputs_hash = Tip5::hash(&self.output_utxos);
 
         info!("Starting proving of {:x}...", txk_mast_hash);
-        info!("Proving RemovalRecordsIntegrity (1/6)...");
 
+        on_progress(ProvingStage::RemovalRecordsIntegrity);
         let removal_records_integrity = RemovalRecordsIntegrity.prove(
             removal_records_integrity_witness.claim(),
             removal_records_integrity_witness.nondeterminism(),
         )?;
 
-        info!("Proving CollectLockScripts (2/6)...");
+        on_progress(ProvingStage::CollectLockScripts);
         let collect_lock_scripts = CollectLockScripts.prove(
             collect_lock_scripts_witness.claim(),
             collect_lock_scripts_witness.nondeterminism(),
         )?;
 
-        info!("Proving KernelToOutputs (3/6)...");
+        on_progress(ProvingStage::KernelToOutputs);
         let kernel_to_outputs = KernelToOutputs.prove(
             kernel_to_outputs_witness.claim(),
             kernel_to_outputs_witness.nondeterminism(),
         )?;
 
-        info!("Proving CollectTypeScripts (4/6)...");
+        on_progress(ProvingStage::CollectTypeScripts);
         let collect_type_scripts = CollectTypeScripts.prove(
             collect_type_scripts_witness.claim(),
             collect_type_scripts_witness.nondeterminism(),
         )?;
 
-        info!("Proving lock scripts (5/6)...");
+        let lock_scripts_len = self.lock_scripts_and_witnesses.len();
         let mut lock_scripts_halt = vec![];
-        for lock_script_and_witness in &self.lock_scripts_and_witnesses {
+
+        for (i, lock_script_and_witness) in self.lock_scripts_and_witnesses.iter().enumerate() {
+            on_progress(ProvingStage::LockScript {
+                index: i,
+                total: lock_scripts_len,
+                program_hash: lock_script_and_witness.program.hash(),
+            });
             lock_scripts_halt.push(lock_script_and_witness.prove(txk_mast_hash_as_input.clone())?);
         }
 
-        info!("Proving type scripts (6/6)...");
+        let type_scripts_len = self.type_scripts_and_witnesses.len();
         let mut type_scripts_halt = vec![];
+
         for (i, tsaw) in self.type_scripts_and_witnesses.iter().enumerate() {
-            info!("Proving type script {i}: {:x}.", tsaw.program.hash());
+            let hash = tsaw.program.hash();
+            on_progress(ProvingStage::TypeScript {
+                index: i,
+                total: type_scripts_len,
+                program_hash: tsaw.program.hash(),
+                name: known_type_scripts::typescript_name(hash).to_owned(),
+            });
             type_scripts_halt.push(tsaw.prove(
                 txk_mast_hash,
                 salted_inputs_hash,
@@ -569,6 +606,28 @@ impl PrimitiveWitness {
             salted_outputs_hash,
             merge_bit_mast_path,
         })
+    }
+
+    fn extract_specific_witnesses(
+        &self,
+    ) -> (
+        RemovalRecordsIntegrityWitness,
+        CollectLockScriptsWitness,
+        KernelToOutputsWitness,
+        CollectTypeScriptsWitness,
+    ) {
+        // collect witnesses
+        let removal_records_integrity_witness = RemovalRecordsIntegrityWitness::from(self);
+        let collect_lock_scripts_witness = CollectLockScriptsWitness::from(self);
+        let kernel_to_outputs_witness = KernelToOutputsWitness::from(self);
+        let collect_type_scripts_witness = CollectTypeScriptsWitness::from(self);
+
+        (
+            removal_records_integrity_witness,
+            collect_lock_scripts_witness,
+            kernel_to_outputs_witness,
+            collect_type_scripts_witness,
+        )
     }
 }
 
