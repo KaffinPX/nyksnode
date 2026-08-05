@@ -13,7 +13,6 @@ use nyks_standards::wallet::keys::address::Address;
 use nyks_standards::wallet::keys::address::Recipient;
 use nyks_standards::wallet::keys::key::KeyType;
 use nyks_standards::wallet::keys::key::Spender;
-
 use nyks_wallet_core::entropy::wallet_entropy::WalletEntropy;
 use nyks_wallet_core::transaction::builder::TransactionBuilder;
 use nyks_wallet_core::transaction::builder::output::TxOutput;
@@ -23,6 +22,7 @@ use tokio::sync::RwLock;
 
 use crate::scanners::chain::AdvanceError;
 use crate::scanners::chain::ChainScanner;
+use crate::scanners::mempool::MempoolScanner;
 use crate::state::address_book::AddressBook;
 use crate::state::utxos::pool::UtxoPool;
 use crate::state::utxos::utxo::MonitoredUtxo;
@@ -71,6 +71,7 @@ pub struct Wallet {
     rpc: HttpClient,
     addresses: Arc<RwLock<AddressBook>>,
     scanner: Arc<RwLock<ChainScanner>>,
+    mempool_scanner: Arc<MempoolScanner>,
     utxos: Arc<RwLock<UtxoPool>>,
     pub network: Network,
 
@@ -89,14 +90,16 @@ impl Wallet {
     ) -> Self {
         let addresses = AddressBook::new(entropy);
         let view_keys = addresses.view_keys().to_vec();
+        let utxos = Arc::new(RwLock::new(UtxoPool::new(rpc.clone())));
 
         Wallet {
-            rpc: rpc.clone(),
+            rpc,
             addresses: Arc::new(RwLock::new(addresses)),
             scanner: Arc::new(RwLock::new(ChainScanner::new(
                 height, None, view_keys, network,
             ))),
-            utxos: Arc::new(RwLock::new(UtxoPool::new(rpc))),
+            mempool_scanner: Arc::new(MempoolScanner::new(utxos.clone())),
+            utxos,
             network,
             pending_events: Arc::new(RwLock::new(Vec::new())),
         }
@@ -167,12 +170,35 @@ impl Wallet {
     pub async fn sync(&self) -> Result<Vec<WalletEvent>, SyncError> {
         let network_height = self.rpc.height().await.unwrap().height;
 
+        let mut events = self.drain_pending_events().await;
+
+        if let Some(chain_events) = self.sync_chain(network_height).await? {
+            events.extend(chain_events);
+        }
+
+        self.sync_mempool().await;
+
+        Ok(events)
+    }
+
+    /// Advances the chain scanner by at most `BATCH_SIZE` blocks (up to
+    /// `network_height`) and updates the UTXO pool with any newly confirmed
+    /// UTXOs.
+    ///
+    /// Returns `None` if the scanner is already caught up to
+    /// `network_height`, in which case there is nothing to do. Otherwise
+    /// returns the `UtxoReceived` events discovered in this batch (which may
+    /// be empty).
+    async fn sync_chain(
+        &self,
+        network_height: BlockHeight,
+    ) -> Result<Option<Vec<WalletEvent>>, SyncError> {
         // Use scan_tip (including unconfirmed blocks) for both the check and the start height.
         let scan_tip = {
             let scanner = self.scanner.read().await;
             let tip = scanner.tip_height();
             if tip >= network_height {
-                return Ok(self.drain_pending_events().await);
+                return Ok(None);
             }
             tip
         };
@@ -198,13 +224,28 @@ impl Wallet {
             utxos.add_utxos(confirmed).await
         };
 
-        let mut events = self.drain_pending_events().await;
-        events.extend(
+        Ok(Some(
             keys.into_iter()
-                .map(|(key, utxo)| WalletEvent::utxo_received(key, utxo)),
-        );
+                .map(|(key, utxo)| WalletEvent::utxo_received(key, utxo))
+                .collect(),
+        ))
+    }
 
-        Ok(events)
+    /// Fetches the current mempool's transactions and feeds their kernels
+    /// to the mempool scanner.
+    async fn sync_mempool(&self) {
+        let mempool_txs = self.rpc.transactions().await.unwrap().transactions;
+
+        let mut kernels = Vec::with_capacity(mempool_txs.len());
+        for id in mempool_txs {
+            let kernel = self.rpc.get_transaction_kernel(id).await.unwrap().kernel;
+
+            if let Some(kernel) = kernel {
+                kernels.push(kernel);
+            }
+        }
+
+        self.mempool_scanner.scan(kernels).await;
     }
 
     /// Takes and returns all events queued by other operations (e.g. `send`)

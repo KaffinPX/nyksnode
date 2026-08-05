@@ -149,6 +149,15 @@ impl MonitoredUtxo {
             self.membership_proof.receiver_preimage.hash(),
         )
     }
+
+    /// Returns the mutator set indices associated with this UTXO.
+    ///
+    /// These indices correspond to the removal record required to spend this UTXO
+    /// and can be used to match on-chain inputs to this UTXO.
+    pub fn indices(&self) -> AbsoluteIndexSet {
+        self.membership_proof
+            .compute_indices(self.mutator_set_item())
+    }
 }
 
 impl Deref for MonitoredUtxo {
