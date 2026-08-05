@@ -21,6 +21,7 @@ use rand::Rng;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
+use tracing::warn;
 
 use crate::application::loops::peer_loop::channel::MainToPeerTask;
 use crate::application::loops::peer_loop::channel::PeerTaskToMain;
@@ -1031,25 +1032,6 @@ impl NetworkActor {
                 };
                 tracing::debug!("{direction} connection established with {peer_id} at {address}.");
 
-                // If this address belongs to one of our sticky peers (`--peer`
-                // CLI arguments) then make sure we record the `PeerId`.
-                if self.sticky_peers.contains_key(&address) {
-                    self.sticky_peers.entry(address.clone()).and_modify(|p| {
-                        match p {
-                            StickyPeer::None | StickyPeer::Dialing(_) => {
-                                tracing::debug!(%peer_id, "Found peer id of sticky peer {address}.");
-                                *p = StickyPeer::Connected(peer_id);
-                            },
-                            StickyPeer::Connected(pid) => {
-                                if *pid != peer_id {
-                                    tracing::debug!(%peer_id, "Found *new* peer id of sticky peer {address}.");
-                                    *pid = peer_id;
-                                }
-                            },
-                        }
-                    });
-                }
-
                 // Store the new connection.
                 self.active_connections
                     .entry(peer_id)
@@ -2030,6 +2012,10 @@ impl NetworkActor {
     /// instance if there are not enough active connections without on-going
     /// relay commitments.
     fn request_peer_relays(&mut self, num_relays: usize) {
+        if num_relays == 0 {
+            return;
+        }
+
         let current_relays = self.relays.keys().collect::<HashSet<_>>();
         let mut available_peers = self
             .active_connections
