@@ -14,6 +14,7 @@ use crate::state::utxos::IncomingUtxo;
 use crate::state::utxos::MonitoredUtxo;
 use crate::state::utxos::MonitoredUtxoStatus;
 use crate::state::utxos::UtxoKey;
+use crate::state::utxos::index::UtxoIndex;
 
 /// Max index sets per `restore_membership_proof` call.
 const RESTORE_BATCH_LIMIT: usize = 128;
@@ -25,6 +26,7 @@ const RESTORE_BATCH_LIMIT: usize = 128;
 pub struct UtxoPool {
     pub rpc: HttpClient,
     pub utxos: HashMap<UtxoKey, MonitoredUtxo>,
+    pub index: UtxoIndex,
 }
 
 /// Result of [`UtxoPool::select_utxos`].
@@ -47,12 +49,22 @@ impl UtxoPool {
         UtxoPool {
             rpc,
             utxos: HashMap::new(),
+            index: UtxoIndex::new(),
         }
     }
 
+    /// Shared handle to this pool's index, for callers (e.g. `MempoolScanner`)
+    /// that only need index lookups, not full pool access.
+    pub fn index(&self) -> UtxoIndex {
+        self.index.clone()
+    }
+
     /// Returns true if it was a new UTXO
-    pub fn import_utxo(&mut self, utxo: MonitoredUtxo) -> bool {
-        self.utxos.insert(UtxoKey::new(&utxo), utxo).is_none()
+    pub async fn import_utxo(&mut self, utxo: MonitoredUtxo) -> bool {
+        let key = UtxoKey::new(&utxo);
+
+        self.index.insert(utxo.indices(), key).await;
+        self.utxos.insert(key, utxo).is_none()
     }
 
     /// Ingests UTXOs, restoring proofs only for the new ones.
@@ -77,9 +89,11 @@ impl UtxoPool {
                 )
                 .unwrap();
             let utxo = utxo.finalize(utxo_msmp);
-            let utxo_key = UtxoKey::new(&utxo);
 
-            self.utxos.insert(utxo_key.clone(), utxo.clone());
+            let utxo_key = UtxoKey::new(&utxo);
+            self.index.insert(utxo.indices(), utxo_key).await;
+            self.utxos.insert(utxo_key, utxo.clone());
+
             added_utxos.push((utxo_key, utxo));
         }
 
@@ -171,8 +185,9 @@ impl UtxoPool {
             // Drop spent UTXOs and retry against what remains.
             for key in spent_utxos {
                 let mut utxo = self.utxos.remove(&key).expect("key was just selected");
-                utxo.status = MonitoredUtxoStatus::SpentInUnknownBlock;
+                self.index.remove(&utxo.indices()).await;
 
+                utxo.status = MonitoredUtxoStatus::SpentInUnknownBlock;
                 invalidated_utxos.push((key, utxo));
             }
         }

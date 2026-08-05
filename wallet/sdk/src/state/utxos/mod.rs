@@ -1,3 +1,4 @@
+pub mod index;
 pub mod pool;
 
 use std::ops::Deref;

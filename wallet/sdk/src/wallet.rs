@@ -39,12 +39,7 @@ pub enum SyncError {
     Advance(#[from] AdvanceError),
 }
 
-/// Events emitted by the wallet as a result of chain-sync activity.
-///
-/// This is intentionally an enum (rather than just returning the raw utxo
-/// pairs) so that future sync-driven activity (e.g. spent-utxo detection,
-/// reorgs, balance-threshold crossings, etc.) can be represented without
-/// changing the signature of `Wallet::sync`.
+/// Events emitted by the wallet as a result of sync and scan activity.
 #[derive(Debug, Clone)]
 pub enum WalletEvent {
     /// A new UTXO was discovered and added to the wallet's UTXO pool.
@@ -112,7 +107,7 @@ impl Wallet {
         let mut utxos_pool = self.utxos.write().await;
 
         for utxo in utxos {
-            let is_unique = utxos_pool.import_utxo(utxo);
+            let is_unique = utxos_pool.import_utxo(utxo).await;
             assert!(is_unique);
         }
     }
