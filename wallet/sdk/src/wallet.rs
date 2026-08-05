@@ -84,8 +84,9 @@ impl Wallet {
         network: Network,
     ) -> Self {
         let addresses = AddressBook::new(entropy);
+        let utxos = UtxoPool::new(rpc.clone());
+
         let view_keys = addresses.view_keys().to_vec();
-        let utxos = Arc::new(RwLock::new(UtxoPool::new(rpc.clone())));
 
         Wallet {
             rpc,
@@ -93,8 +94,8 @@ impl Wallet {
             scanner: Arc::new(RwLock::new(ChainScanner::new(
                 height, None, view_keys, network,
             ))),
-            mempool_scanner: Arc::new(MempoolScanner::new(utxos.clone())),
-            utxos,
+            mempool_scanner: Arc::new(MempoolScanner::new(utxos.index())),
+            utxos: Arc::new(RwLock::new(utxos)),
             network,
             pending_events: Arc::new(RwLock::new(Vec::new())),
         }

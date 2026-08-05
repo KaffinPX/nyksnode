@@ -5,8 +5,8 @@ use std::path::PathBuf;
 
 use nyks_consensus::block::block_height::BlockHeight;
 use nyks_standards::wallet::keys::key::KeyType;
-use nyks_wallet_sdk::state::utxos::utxo::MonitoredUtxo;
-use nyks_wallet_sdk::state::utxos::utxo::UtxoKey;
+use nyks_wallet_sdk::state::utxos::MonitoredUtxo;
+use nyks_wallet_sdk::state::utxos::UtxoKey;
 use serde::Deserialize;
 use serde::Serialize;
 
