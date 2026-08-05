@@ -151,6 +151,17 @@ impl Wallet {
         self.scanner.read().await.unconfirmed_balance()
     }
 
+    pub async fn outgoing_balance(&self) -> NativeCurrencyAmount {
+        let mempool_scanner = self.mempool_scanner.read().await;
+        let utxos = mempool_scanner.pending_spend_utxos();
+
+        self.utxos
+            .read()
+            .await
+            .total_balance_from_utxos(utxos)
+            .await
+    }
+
     /// Sync wallet forward by at most `BATCH_SIZE` blocks.
     ///
     /// Does not necessarily reach the current chain tip in one call, call
@@ -281,7 +292,7 @@ impl Wallet {
         // Generate "spendable" UTXOs and prepare them for spending.
         let timestamp = Timestamp::now();
         let mut utxos = self.utxos.write().await;
-        let selection = utxos.select_utxos(amount + fee, timestamp).await;
+        let selection = utxos.select_utxos(amount + fee, timestamp).await; // TODO: Allow an external filter callback
         drop(utxos);
 
         if !selection.invalidated_utxos.is_empty() {

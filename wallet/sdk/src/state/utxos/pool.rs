@@ -226,6 +226,17 @@ impl UtxoPool {
         total_amount
     }
 
+    /// Sums the amounts of UTXOs matching the given utxo keys
+    pub async fn total_balance_from_utxos<'a>(
+        &self,
+        utxos: impl Iterator<Item = &'a UtxoKey>,
+    ) -> NativeCurrencyAmount {
+        utxos
+            .filter_map(|key| self.utxos.get(key))
+            .map(|utxo| utxo.get_native_currency_amount())
+            .fold(NativeCurrencyAmount::zero(), |acc, amt| acc + amt)
+    }
+
     /// Calls `restore_membership_proof` in chunks of at most
     /// [`RESTORE_BATCH_LIMIT`], retrying if the tip changes mid-flight.
     ///
