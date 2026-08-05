@@ -66,7 +66,7 @@ pub struct Wallet {
     rpc: HttpClient,
     addresses: Arc<RwLock<AddressBook>>,
     scanner: Arc<RwLock<ChainScanner>>,
-    mempool_scanner: Arc<MempoolScanner>,
+    mempool_scanner: Arc<RwLock<MempoolScanner>>,
     utxos: Arc<RwLock<UtxoPool>>,
     pub network: Network,
 
@@ -94,7 +94,7 @@ impl Wallet {
             scanner: Arc::new(RwLock::new(ChainScanner::new(
                 height, None, view_keys, network,
             ))),
-            mempool_scanner: Arc::new(MempoolScanner::new(utxos.index())),
+            mempool_scanner: Arc::new(RwLock::new(MempoolScanner::new(utxos.index()))),
             utxos: Arc::new(RwLock::new(utxos)),
             network,
             pending_events: Arc::new(RwLock::new(Vec::new())),
@@ -231,17 +231,31 @@ impl Wallet {
     /// to the mempool scanner.
     async fn sync_mempool(&self) {
         let mempool_txs = self.rpc.transactions().await.unwrap().transactions;
+        let ids_to_fetch = self
+            .mempool_scanner
+            .read()
+            .await
+            .ids_to_fetch(&mempool_txs)
+            .await;
 
-        let mut kernels = Vec::with_capacity(mempool_txs.len());
-        for id in mempool_txs {
-            let kernel = self.rpc.get_transaction_kernel(id).await.unwrap().kernel;
-
+        let mut kernels = Vec::with_capacity(ids_to_fetch.len());
+        for id in ids_to_fetch {
+            let kernel = self
+                .rpc
+                .get_transaction_kernel(id.clone())
+                .await
+                .unwrap()
+                .kernel;
             if let Some(kernel) = kernel {
-                kernels.push(kernel);
+                kernels.push((id, kernel));
             }
         }
 
-        self.mempool_scanner.scan(kernels).await;
+        let mut mempool_scanner = self.mempool_scanner.write().await;
+        mempool_scanner.scan(kernels).await;
+
+        // keep cache from growing unbounded as txs leave the mempool
+        mempool_scanner.evict_stale(mempool_txs).await;
     }
 
     /// Takes and returns all events queued by other operations (e.g. `send`)
