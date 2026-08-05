@@ -10,10 +10,10 @@ use nyks_rpc_client::RpcApi;
 use nyks_rpc_client::http::HttpClient;
 use nyks_rpc_client::wallet::mutator_set::RpcMsMembershipProofPrivacyPreserving;
 
-use crate::state::utxos::utxo::IncomingUtxo;
-use crate::state::utxos::utxo::MonitoredUtxo;
-use crate::state::utxos::utxo::MonitoredUtxoStatus;
-use crate::state::utxos::utxo::UtxoKey;
+use crate::state::utxos::IncomingUtxo;
+use crate::state::utxos::MonitoredUtxo;
+use crate::state::utxos::MonitoredUtxoStatus;
+use crate::state::utxos::UtxoKey;
 
 /// Max index sets per `restore_membership_proof` call.
 const RESTORE_BATCH_LIMIT: usize = 128;

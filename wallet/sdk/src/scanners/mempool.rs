@@ -5,7 +5,8 @@ use nyks_rpc_client::block::transaction_kernel::RpcTransactionKernel;
 use tokio::sync::RwLock;
 use tracing::info;
 
-use crate::state::utxos::{pool::UtxoPool, utxo::UtxoKey};
+use crate::state::utxos::UtxoKey;
+use crate::state::utxos::pool::UtxoPool;
 
 /// Scans invidual transactions batch independant of chain
 /// interacting with current utxo pool

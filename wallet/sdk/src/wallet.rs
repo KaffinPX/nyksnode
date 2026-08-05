@@ -24,9 +24,9 @@ use crate::scanners::chain::AdvanceError;
 use crate::scanners::chain::ChainScanner;
 use crate::scanners::mempool::MempoolScanner;
 use crate::state::address_book::AddressBook;
+use crate::state::utxos::MonitoredUtxo;
+use crate::state::utxos::UtxoKey;
 use crate::state::utxos::pool::UtxoPool;
-use crate::state::utxos::utxo::MonitoredUtxo;
-use crate::state::utxos::utxo::UtxoKey;
 
 const BATCH_SIZE: usize = 100;
 

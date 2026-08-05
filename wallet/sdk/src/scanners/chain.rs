@@ -19,7 +19,7 @@ use nyks_standards::wallet::keys::viewing_key::Decryptor;
 use nyks_standards::wallet::keys::viewing_key::ViewingKey;
 use thiserror::Error;
 
-use crate::state::utxos::utxo::IncomingUtxo;
+use crate::state::utxos::IncomingUtxo;
 
 #[derive(Debug, Copy, Clone, Error)]
 pub enum AdvanceError {
