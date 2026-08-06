@@ -7,17 +7,11 @@ use nyks_rpc_client::block::transaction_kernel::RpcTransactionKernel;
 use crate::state::utxos::UtxoKey;
 use crate::state::utxos::index::UtxoIndex;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum TxStatus {
-    Relevant,
-    Unrelated,
-}
-
 /// Scans mempool transactions against the current UTXO pool.
 pub struct MempoolScanner {
     index: UtxoIndex,
-    // IDs we've already checked.
-    cache: HashMap<TransactionKernelId, TxStatus>,
+    // IDs we've already checked, relevant or not - never rescanned.
+    checked_ids: HashSet<TransactionKernelId>,
     // UTXOs currently observed as spent by relevant mempool transactions.
     pub pending_spends: HashMap<UtxoKey, HashSet<TransactionKernelId>>, // Kept supporting multiple txs just in case
 }
@@ -26,24 +20,19 @@ impl MempoolScanner {
     pub fn new(index: UtxoIndex) -> Self {
         MempoolScanner {
             index,
-            cache: HashMap::new(),
+            checked_ids: HashSet::new(),
             pending_spends: HashMap::new(),
         }
     }
 
-    /// Returns IDs that need to be fetched.
-    /// Unrelated transactions are skipped if already cached.
+    /// Returns IDs that need to be fetched, i.e. ones we haven't checked yet.
     pub async fn ids_to_fetch(
         &self,
         mempool_ids: &[TransactionKernelId],
     ) -> Vec<TransactionKernelId> {
         mempool_ids
             .iter()
-            .filter(|id| match self.cache.get(id) {
-                Some(TxStatus::Unrelated) => false,
-                Some(TxStatus::Relevant) => true,
-                None => true,
-            })
+            .filter(|id| !self.checked_ids.contains(id))
             .cloned()
             .collect()
     }
@@ -60,34 +49,40 @@ impl MempoolScanner {
         self.pending_spends.keys()
     }
 
-    /// Checks the transactions and updates their status in the cache.
-    pub async fn scan(&mut self, transactions: Vec<(TransactionKernelId, RpcTransactionKernel)>) {
+    /// Checks the transactions and marks them as checked. Each transaction
+    /// is scanned at most once ever; relevant ones are returned only here.
+    pub async fn scan(
+        &mut self,
+        transactions: Vec<(TransactionKernelId, RpcTransactionKernel)>,
+    ) -> Vec<(TransactionKernelId, Vec<UtxoKey>)> {
+        let mut relevant_transactions = Vec::new();
+
         for (id, transaction) in &transactions {
-            let mut relevant = false;
+            let mut spent_inputs = Vec::new();
 
             for input in &transaction.inputs {
                 if let Some(utxo_key) = self.index.get(&input.absolute_indices).await {
                     self.pending_spends.entry(utxo_key).or_default().insert(*id);
-                    relevant = true;
+                    spent_inputs.push(utxo_key);
                 }
             }
 
-            self.cache.insert(
-                *id,
-                if relevant {
-                    TxStatus::Relevant
-                } else {
-                    TxStatus::Unrelated
-                },
-            );
+            self.checked_ids.insert(*id);
+
+            if !spent_inputs.is_empty() {
+                relevant_transactions.push((*id, spent_inputs));
+            }
         }
+
+        relevant_transactions
     }
 
     /// Removes transactions that are no longer in the mempool.
     pub async fn evict_stale(&mut self, current_mempool_ids: Vec<TransactionKernelId>) {
         let current_mempool_ids: HashSet<_> = current_mempool_ids.into_iter().collect();
 
-        self.cache.retain(|id, _| current_mempool_ids.contains(id));
+        self.checked_ids
+            .retain(|id| current_mempool_ids.contains(id));
 
         // Drop stale tx ids from each UTXO's spender set, and drop the
         // UTXO entry entirely once no live tx is spending it anymore.

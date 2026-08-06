@@ -49,6 +49,14 @@ pub enum WalletEvent {
     /// invalid) while syncing membership proofs, and was evicted from the
     /// pool.
     UtxoInvalidated { key: UtxoKey, utxo: MonitoredUtxo },
+
+    /// A mempool transaction was found to spend one or more of the
+    /// wallet's UTXOs. Emitted once per transaction, the first time it's
+    /// observed as relevant.
+    UtxosOutgoing {
+        id: TransactionKernelId,
+        utxos: Vec<UtxoKey>,
+    },
 }
 
 impl WalletEvent {
@@ -58,6 +66,10 @@ impl WalletEvent {
 
     pub fn utxo_invalidated(key: UtxoKey, utxo: MonitoredUtxo) -> Self {
         WalletEvent::UtxoInvalidated { key, utxo }
+    }
+
+    pub fn utxos_outgoing(id: TransactionKernelId, utxos: Vec<UtxoKey>) -> Self {
+        WalletEvent::UtxosOutgoing { id, utxos }
     }
 }
 
@@ -179,11 +191,11 @@ impl Wallet {
 
         let mut events = self.drain_pending_events().await;
 
+        events.extend(self.sync_mempool().await);
+
         if let Some(chain_events) = self.sync_chain(network_height).await? {
             events.extend(chain_events);
         }
-
-        self.sync_mempool().await;
 
         Ok(events)
     }
@@ -240,7 +252,7 @@ impl Wallet {
 
     /// Fetches the current mempool's transactions and feeds their kernels
     /// to the mempool scanner.
-    async fn sync_mempool(&self) {
+    async fn sync_mempool(&self) -> Vec<WalletEvent> {
         let mempool_txs = self.rpc.transactions().await.unwrap().transactions;
         let ids_to_fetch = self
             .mempool_scanner
@@ -263,10 +275,15 @@ impl Wallet {
         }
 
         let mut mempool_scanner = self.mempool_scanner.write().await;
-        mempool_scanner.scan(kernels).await;
+        let outgoing_utxos = mempool_scanner.scan(kernels).await;
 
         // keep cache from growing unbounded as txs leave the mempool
         mempool_scanner.evict_stale(mempool_txs).await;
+
+        outgoing_utxos
+            .into_iter()
+            .map(|(id, utxos)| WalletEvent::utxos_outgoing(id, utxos))
+            .collect()
     }
 
     /// Takes and returns all events queued by other operations (e.g. `send`)

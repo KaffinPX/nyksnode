@@ -96,6 +96,9 @@ async fn main() -> Result<()> {
 
                     storage.utxos.put(&key, &utxo);
                 }
+                WalletEvent::UtxosOutgoing { id, utxos } => {
+                    info!("{} UTXOs being spent on transaction {}.", utxos.len(), id);
+                }
             }
         }
 
