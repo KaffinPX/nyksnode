@@ -12,13 +12,13 @@ use clap::Parser;
 use libp2p::multiaddr::Protocol;
 use libp2p::Multiaddr;
 use nyks_consensus::transaction::transaction_proof::TransactionProofQuality;
+use nyks_consensus::network::Network;
+use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
+use nyks_rpc_core::api::ops::Namespace;
 use tracing::error;
 
 use crate::application::config::parser::multiaddr::parse_to_multiaddr;
 use crate::state::mining::block_proposal::BlockProposalRejectError;
-use nyks_consensus::network::Network;
-use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
-use nyks_rpc_core::api::ops::Namespace;
 
 const MAX_NUM_INPUTS_FOR_PC_BACKED_TXS: u64 = 200;
 
@@ -98,15 +98,6 @@ pub struct Args {
     )]
     pub(crate) max_num_peers: usize,
 
-    /// Maximum number of peers to accept from each IP address.
-    ///
-    /// Multiple nodes can run on the same IP address which would either mean
-    /// that multiple nodes run on the same machine, or multiple machines are
-    /// on the same network that uses Network Address Translation and has one
-    /// public IP.
-    #[clap(long)]
-    pub(crate) max_connections_per_ip: Option<usize>,
-
     /// Handshake timeout in seconds.
     ///
     /// The timeout used for all messages received and sent during the handshake
@@ -170,11 +161,11 @@ pub struct Args {
     pub(crate) max_mempool_size: ByteSize,
 
     /// Port on which to listen for libp2p QUIC peer connections.
-    #[clap(long, default_value = "9800", value_name = "PORT")]
+    #[clap(long, default_value = "27828", value_name = "PORT")]
     pub quic_port: u16,
 
     /// Port on which to listen for libp2p TCP peer connections.
-    #[clap(long, default_value = "9801", value_name = "PORT")]
+    #[clap(long, default_value = "27829", value_name = "PORT")]
     pub tcp_port: u16,
 
     /// IP on which to listen for peer connections. Will default to all network
