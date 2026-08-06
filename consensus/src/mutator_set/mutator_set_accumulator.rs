@@ -102,6 +102,7 @@ impl MutatorSetAccumulator {
 
     /// Return the lowest and the highest chunk index that are represented in
     /// the active window, inclusive.
+    /// 
     /// The returned limits are inclusive, i.e. they point to the chunk with
     /// the lowest chunk index and the chunk with the highest chunk index that
     /// are still contained in the active window.
@@ -109,7 +110,7 @@ impl MutatorSetAccumulator {
         let batch_index = self.get_batch_index();
         (
             batch_index,
-            batch_index + u64::from(WINDOW_SIZE / CHUNK_SIZE),
+            batch_index + u64::from(WINDOW_SIZE / CHUNK_SIZE) - 1,
         )
     }
 

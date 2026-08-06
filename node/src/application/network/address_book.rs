@@ -30,11 +30,11 @@ pub(crate) struct Peer {
     /// Unlike the active connection, these are persistent locations.
     pub(crate) listen_addresses: Vec<Multiaddr>,
 
-    /// The software version of the node (e.g., "neptune-cash/0.6.0").
+    /// The software version of the node (e.g., "nyks-node/0.6.0").
     /// Useful for telemetry and identifying "heavy" or "light" nodes.
     pub(crate) agent_version: String,
 
-    /// The protocol version (e.g., "/neptune/-main").
+    /// The protocol version (e.g., "/nyks/-main").
     /// Essential for ensuring you don't sync with incompatible forks.
     pub(crate) protocol_version: String,
 

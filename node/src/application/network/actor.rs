@@ -21,7 +21,6 @@ use rand::Rng;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
-use tracing::warn;
 
 use crate::application::loops::peer_loop::channel::MainToPeerTask;
 use crate::application::loops::peer_loop::channel::PeerTaskToMain;
@@ -86,12 +85,12 @@ impl RelayStatus {
     }
 }
 
-/// The libp2p adapter for the Neptune network stack.
+/// The libp2p adapter for the Nyks network stack.
 ///
 /// The [`NetworkActor`] serves as a specialized interface between the libp2p
 /// network stack and the application's main loop. Unlike typical actor models,
 /// this struct does not own the primary event loop; instead, it facilitates the
-/// transition of libp2p-negotiated connections into the standard Neptune
+/// transition of libp2p-negotiated connections into the standard Nyks
 /// protocol ecosystem. Specifically, it mediates establishment of a libp2p
 /// stream which it then hijacks and passes to a freshly spawned peer loop.
 ///
@@ -105,7 +104,7 @@ impl RelayStatus {
 ///    the validated [`Stream`](libp2p::Stream) and passes it into a concrete
 ///    protocol handler.
 /// 3. **Protocol Unified Logic**: It spawns the same peer loop used by the
-///    legacy network stack. Consequently Neptune message handling remains
+///    legacy network stack. Consequently Nyks message handling remains
 ///    unified regardless of the transport layer.
 ///
 /// ### Integration:
