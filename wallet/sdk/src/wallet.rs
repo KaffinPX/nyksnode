@@ -288,12 +288,20 @@ impl Wallet {
         fee: NativeCurrencyAmount,
     ) -> Result<TransactionKernelId, RpcError> {
         let height = self.tip_height().await;
+        let timestamp = Timestamp::now();
 
         // Generate "spendable" UTXOs and prepare them for spending.
-        let timestamp = Timestamp::now();
         let mut utxos = self.utxos.write().await;
-        let selection = utxos.select_utxos(amount + fee, timestamp).await; // TODO: Allow an external filter callback
-        drop(utxos);
+        let excluded_utxos = self
+            .mempool_scanner
+            .read()
+            .await
+            .pending_spend_utxos()
+            .copied()
+            .collect();
+        let selection = utxos
+            .select_utxos(amount + fee, timestamp, Some(excluded_utxos))
+            .await;
 
         if !selection.invalidated_utxos.is_empty() {
             let mut pending = self.pending_events.write().await;

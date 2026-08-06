@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use num_traits::CheckedSub;
 use num_traits::Zero;
@@ -103,6 +104,9 @@ impl UtxoPool {
     /// Greedily selects UTXOs covering `amount`, syncing only the selected
     /// ones against current chain state.
     ///
+    /// UTXOs whose keys appear in `exclude` are skipped entirely, e.g. ones
+    /// already committed to another in-flight transaction.
+    ///
     /// Spent UTXOs are evicted and selection retries against the rest; all
     /// evictions are collected and returned. Every returned UTXO is valid
     /// against the returned `msa`.
@@ -110,6 +114,7 @@ impl UtxoPool {
         &mut self,
         amount: NativeCurrencyAmount,
         timestamp: Timestamp,
+        exclude: Option<HashSet<UtxoKey>>,
     ) -> UtxosSelection {
         let mut invalidated_utxos = Vec::new();
 
@@ -122,6 +127,10 @@ impl UtxoPool {
             for (key, utxo) in self.utxos.iter() {
                 if total_amount >= amount {
                     break;
+                }
+
+                if exclude.as_ref().is_some_and(|e| e.contains(key)) {
+                    continue;
                 }
 
                 if !utxo.can_spend_at(timestamp) {
