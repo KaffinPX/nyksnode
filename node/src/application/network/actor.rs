@@ -85,12 +85,12 @@ impl RelayStatus {
     }
 }
 
-/// The libp2p adapter for the Neptune network stack.
+/// The libp2p adapter for the Nyks network stack.
 ///
 /// The [`NetworkActor`] serves as a specialized interface between the libp2p
 /// network stack and the application's main loop. Unlike typical actor models,
 /// this struct does not own the primary event loop; instead, it facilitates the
-/// transition of libp2p-negotiated connections into the standard Neptune
+/// transition of libp2p-negotiated connections into the standard Nyks
 /// protocol ecosystem. Specifically, it mediates establishment of a libp2p
 /// stream which it then hijacks and passes to a freshly spawned peer loop.
 ///
@@ -104,7 +104,7 @@ impl RelayStatus {
 ///    the validated [`Stream`](libp2p::Stream) and passes it into a concrete
 ///    protocol handler.
 /// 3. **Protocol Unified Logic**: It spawns the same peer loop used by the
-///    legacy network stack. Consequently Neptune message handling remains
+///    legacy network stack. Consequently Nyks message handling remains
 ///    unified regardless of the transport layer.
 ///
 /// ### Integration:
@@ -734,7 +734,7 @@ impl NetworkActor {
                     .count()
                     > 1;
                 if is_multihop {
-                    tracing::warn!(
+                    tracing::debug!(
                         "Rejecting multi-hop listen address {address} because multi-hop."
                     );
                     return Ok(());
@@ -1030,25 +1030,6 @@ impl NetworkActor {
                     "Inbound"
                 };
                 tracing::debug!("{direction} connection established with {peer_id} at {address}.");
-
-                // If this address belongs to one of our sticky peers (`--peer`
-                // CLI arguments) then make sure we record the `PeerId`.
-                if self.sticky_peers.contains_key(&address) {
-                    self.sticky_peers.entry(address.clone()).and_modify(|p| {
-                        match p {
-                            StickyPeer::None | StickyPeer::Dialing(_) => {
-                                tracing::debug!(%peer_id, "Found peer id of sticky peer {address}.");
-                                *p = StickyPeer::Connected(peer_id);
-                            },
-                            StickyPeer::Connected(pid) => {
-                                if *pid != peer_id {
-                                    tracing::debug!(%peer_id, "Found *new* peer id of sticky peer {address}.");
-                                    *pid = peer_id;
-                                }
-                            },
-                        }
-                    });
-                }
 
                 // Store the new connection.
                 self.active_connections
@@ -2030,6 +2011,10 @@ impl NetworkActor {
     /// instance if there are not enough active connections without on-going
     /// relay commitments.
     fn request_peer_relays(&mut self, num_relays: usize) {
+        if num_relays == 0 {
+            return;
+        }
+
         let current_relays = self.relays.keys().collect::<HashSet<_>>();
         let mut available_peers = self
             .active_connections
