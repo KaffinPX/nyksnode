@@ -220,33 +220,6 @@ impl NetworkActorChannels {
     ///    main loop to receive notifications from the [`NetworkActor`]
     ///    (notifications of events).
     ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// use tokio::sync::broadcast;
-    /// use tokio::sync::mpsc;
-    ///
-    /// use crate::application::loops::peer_loop::channel::PeerTaskToMain;
-    /// use crate::application::loops::peer_loop::channel::MainToPeerTask;
-    /// use crate::application::network::actor::NetworkActorChannels;
-    ///
-    /// // Construct the broadcast channel to communicate from the main task to
-    /// // peer tasks
-    /// let (main_to_peer_broadcast_tx, _main_to_peer_broadcast_rx) =
-    ///     broadcast::channel::<MainToPeerTask>(1000);
-    ///
-    /// // Add the MPSC (multi-producer, single consumer) channel for
-    /// // peer-task-to-main communication
-    /// let (peer_task_to_main_tx, peer_task_to_main_rx) =
-    ///     mpsc::channel::<PeerTaskToMain>(1000);
-    ///
-    /// // Construct the channels for the `NetworkActor`
-    /// let (channels, network_command_tx, network_event_rx) = NetworkActorChannels::setup(
-    ///     peer_task_to_main_tx.clone(),
-    ///     main_to_peer_broadcast_tx.clone(),
-    /// );
-    /// ```
-    ///
     /// (Note that the doctest cannor run because message types `PeerTaskToMain`
     /// and `MainToPeerTask`, not to mention this constructor, are private.)
     pub(crate) fn setup(

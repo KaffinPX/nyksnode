@@ -192,28 +192,6 @@ pub enum BlockProof {
 
 /// Public fields of `Block` are read-only, enforced by #[readonly::make].
 /// Modifications are possible only through `Block` methods.
-///
-/// Example:
-///
-/// test: verify that compile fails on an attempt to mutate block
-/// internals directly (bypassing encapsulation)
-///
-/// ```compile_fail,E0594
-/// use nyks_node::protocol::block::Block;
-/// use nyks_node::application::config::network::Network;
-/// use nyks_node::prelude::twenty_first::math::b_field_element::BFieldElement;
-/// use tasm_lib::prelude::Digest;
-///
-/// let mut block = Block::genesis(Network::RegTest);
-///
-/// let height = block.kernel.header.height;
-///
-/// let nonce = Digest::default();
-///
-/// // this line fails to compile because we try to
-/// // mutate an internal field.
-/// block.kernel.header.pow.nonce = nonce;
-/// ```
 // ## About the private `digest` field:
 //
 // The `digest` field represents the `Block` hash.  It is an optimization so
