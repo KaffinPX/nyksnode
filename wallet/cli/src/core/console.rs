@@ -134,21 +134,30 @@ pub async fn start_console(wallet: Wallet) {
                 let spendable_balance = wallet.spendable_balance().await;
                 let total_balance = wallet.total_balance().await;
                 let unconfirmed_balance = wallet.unconfirmed_balance().await;
+                let outgoing_balance = wallet.outgoing_balance().await;
 
-                info!(
-                    "Balance: {} NYKS ({} UTXOs; {} spendable, {} timelocked, {} unconfirmed).",
+                println!(
+                    "\n\
+                        Balance\n\
+                        ├─ Total:       {} NYKS\n\
+                        ├─ Spendable:   {} NYKS\n\
+                        ├─ Timelocked:  {} NYKS\n\
+                        ├─ Unconfirmed: {} NYKS\n\
+                        ├─ Outgoing:    {} NYKS\n\
+                        └─ UTXOs:       {}\n",
                     total_balance,
-                    utxo_count,
                     spendable_balance,
                     total_balance.checked_sub(&spendable_balance).unwrap(),
                     unconfirmed_balance,
+                    outgoing_balance,
+                    utxo_count,
                 );
             }
             Command::Address(key_type) => {
                 let key_type = key_type.unwrap_or(KeyType::Generation);
                 let address = wallet.address(key_type).await;
 
-                println!("\n{}", address.to_bech32m(wallet.network));
+                println!("\n{}\n", address.to_bech32m(wallet.network));
             }
             Command::Send {
                 recipient,

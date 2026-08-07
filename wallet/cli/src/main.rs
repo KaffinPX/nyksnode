@@ -1,3 +1,5 @@
+pub mod core;
+
 use std::panic;
 use std::time::Duration;
 
@@ -13,8 +15,6 @@ use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 use crate::core::storage::Storage;
-
-pub mod core;
 
 #[derive(Parser)]
 #[command(name = "nyks-wallet")]
@@ -95,6 +95,9 @@ async fn main() -> Result<()> {
                     );
 
                     storage.utxos.put(&key, &utxo);
+                }
+                WalletEvent::UtxosOutgoing { id, utxos } => {
+                    info!("{} UTXOs being spent on transaction {}.", utxos.len(), id);
                 }
             }
         }
