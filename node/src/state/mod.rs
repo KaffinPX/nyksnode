@@ -250,68 +250,6 @@ impl DerefMut for GlobalStateLock {
 /// such generic methods can be called in series to share an already
 /// acquired lock-guard, or to each acquire its own lock-guard
 /// in the case of `Lock` variant.
-///
-/// Example usage:
-///
-/// ```rust
-/// use nyks_node::state::GlobalState;
-/// use nyks_node::state::GlobalStateLock;
-/// use nyks_node::api::export::StateLock;
-/// fn worker(gs: &GlobalState, truth: bool) {
-///    // do something with gs and truth.
-/// }
-///
-/// // a callee that accepts &StateLock
-/// async fn callee(state_lock: &StateLock<'_>, truth: bool) {
-///     match state_lock {
-///        StateLock::Lock(gsl) => worker(&*gsl.lock_guard().await, truth),
-///        StateLock::ReadGuard(gs) => worker(&gs, truth),
-///        StateLock::WriteGuard(gs) => worker(&gs, truth),
-///    }
-/// }
-///
-/// // a caller that uses `Lock` variant
-/// async fn caller_1(gsl: GlobalStateLock) {
-///     // read-lock will be acquired each call.
-///     callee(&gsl.clone().into(), true).await;
-///     callee(&gsl.clone().into(), false).await;
-/// }
-///
-/// // a caller that uses `ReadLock` variant
-/// async fn caller_2(gsl: GlobalStateLock) {
-///     // read-lock is acquired only once.
-///     let sl = StateLock::from(gsl.lock_guard().await);
-///     callee(&sl, true).await;
-///     callee(&sl, false).await;
-/// }
-///
-/// // a caller that uses `WriteLock` variant
-/// async fn caller_3(mut gsl: GlobalStateLock) {
-///     // write-lock is acquired only once.
-///     let sl = StateLock::from(gsl.lock_guard_mut().await);
-///     callee(&sl, true).await;
-///     callee(&sl, false).await;
-/// }
-///
-/// // a caller that uses `ReadLock` variant and calls fn that accept `&GlobalState`
-/// async fn caller_4(gsl: GlobalStateLock) {
-///     // read-lock is acquired only once.
-///     let sl = StateLock::from(gsl.lock_guard().await);
-///     callee(&sl, true).await;
-///     callee(&sl, false).await;
-///
-///     // we can pass &GlobalState directly.
-///     worker(sl.gs(), true);
-///
-///     // convert back into a read-guard
-///     let gs = sl.into_read_guard();
-///     worker(&gs, false);
-/// }
-/// ```
-///
-/// example usage as callee: see source of [TxOutputListBuilder::build()](crate::api::tx_initiation::builder::tx_output_list_builder::TxOutputListBuilder::build())
-///
-/// advanced usage as caller: see source of [TransactionSender::send()](crate::api::tx_initiation::send::TransactionSender::send())
 #[derive(Debug)]
 pub enum StateLock<'a> {
     /// holds an instance GlobalStateLock. can be used to

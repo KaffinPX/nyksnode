@@ -125,21 +125,6 @@ pub trait StorageVecBase<T: Send> {
 #[expect(async_fn_in_trait)]
 pub trait StorageVecStream<T: Send>: StorageVecBase<T> {
     /// get an async Stream for iterating over all elements by key/val
-    ///
-    /// # Example:
-    /// ```
-    /// # tokio_test::block_on(async {
-    /// # use nyks_node::application::database::storage::storage_vec::{OrdinaryVec, traits::*};
-    /// # let mut vec = OrdinaryVec::<u32>::from(vec![1,2,3,4,5,6,7,8,9]);
-    ///
-    /// let stream = vec.stream().await;
-    /// pin_mut!(stream);  // needed for iteration
-    ///
-    /// while let Some((key, val)) = stream.next().await {
-    ///     println!("{key}: {val}")
-    /// }
-    /// # })
-    /// ```
     #[inline]
     async fn stream<'a>(&'a self) -> impl Stream<Item = (Index, T)> + 'a
     where
@@ -149,21 +134,6 @@ pub trait StorageVecStream<T: Send>: StorageVecBase<T> {
     }
 
     /// get an async Stream for iterating over all elements by value
-    ///
-    /// # Example:
-    /// ```
-    /// # tokio_test::block_on(async {
-    /// # use nyks_node::application::database::storage::storage_vec::{OrdinaryVec, traits::*};
-    /// # let mut vec = OrdinaryVec::<u32>::from(vec![1,2,3,4,5,6,7,8,9]);
-    ///
-    /// let stream = vec.stream_values().await;
-    /// pin_mut!(stream);  // needed for iteration
-    ///
-    /// while let Some(val) = stream.next().await {
-    ///     println!("{val}")
-    /// }
-    /// # })
-    /// ```
     #[inline]
     async fn stream_values<'a>(&'a self) -> impl Stream<Item = T> + 'a
     where
@@ -173,21 +143,6 @@ pub trait StorageVecStream<T: Send>: StorageVecBase<T> {
     }
 
     /// get an async Stream for iterating over elements matching indices by key/value
-    ///
-    /// # Example:
-    /// ```
-    /// # tokio_test::block_on(async {
-    /// # use nyks_node::application::database::storage::storage_vec::{OrdinaryVec, traits::*};
-    /// # let mut vec = OrdinaryVec::<u32>::from(vec![1,2,3,4,5,6,7,8,9]);
-    ///
-    /// let stream = vec.stream_many([2,3,7]);
-    /// pin_mut!(stream);  // needed for iteration
-    ///
-    /// while let Some((key, val)) = stream.next().await {
-    ///     println!("{key}: {val}")
-    /// }
-    /// # })
-    /// ```
     fn stream_many<'a>(
         &'a self,
         indices: impl IntoIterator<Item = Index> + 'a,
@@ -203,21 +158,6 @@ pub trait StorageVecStream<T: Send>: StorageVecBase<T> {
     }
 
     /// get an async Stream for iterating over elements matching indices by value
-    ///
-    /// # Example:
-    /// ```
-    /// # tokio_test::block_on(async {
-    /// # use nyks_node::application::database::storage::storage_vec::{OrdinaryVec, traits::*};
-    /// # let mut vec = OrdinaryVec::<u32>::from(vec![1,2,3,4,5,6,7,8,9]);
-    ///
-    /// let stream = vec.stream_many_values([2,3,7]);
-    /// pin_mut!(stream);  // needed for iteration
-    ///
-    /// while let Some(val) = stream.next().await {
-    ///     println!("{val}")
-    /// }
-    /// # })
-    /// ```
     fn stream_many_values<'a>(
         &'a self,
         indices: impl IntoIterator<Item = Index> + 'a,

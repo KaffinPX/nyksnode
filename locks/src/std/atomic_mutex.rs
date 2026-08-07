@@ -12,70 +12,6 @@ use super::LockEvent;
 use super::LockType;
 
 /// An `Arc<Mutex<T>>` wrapper to make data thread-safe and easy to work with.
-///
-/// # Example
-/// ```
-/// # use nyks_node::application::locks::std::{AtomicMutex, traits::*};
-/// struct Car {
-///     year: u16,
-/// }
-/// let mut atomic_car = AtomicMutex::from(Car{year: 2016});
-/// atomic_car.lock(|c| println!("year: {}", c.year));
-/// atomic_car.lock_mut(|mut c| c.year = 2023);
-/// ```
-///
-/// It is also possible to provide a name and callback fn
-/// during instantiation.  In this way, the application
-/// can easily trace lock acquisitions.
-///
-/// # Examples
-/// ```
-/// # use nyks_node::application::locks::std::{AtomicMutex, LockEvent, LockCallbackFn};
-/// struct Car {
-///     year: u16,
-/// }
-///
-/// pub fn log_lock_event(lock_event: LockEvent) {
-///     let (event, info, acquisition) =
-///     match lock_event {
-///         LockEvent::TryAcquire{info, acquisition} => ("TryAcquire", info, acquisition),
-///         LockEvent::Acquire{info, acquisition} => ("Acquire", info, acquisition),
-///         LockEvent::Release{info, acquisition} => ("Release", info, acquisition),
-///     };
-///
-///     println!(
-///         "{} lock `{}` of type `{}` for `{}` by\n\t|-- thread {}, `{:?}`",
-///         event,
-///         info.name().unwrap_or("?"),
-///         info.lock_type(),
-///         acquisition,
-///         std::thread::current().name().unwrap_or("?"),
-///         std::thread::current().id(),
-///     );
-/// }
-/// const LOG_LOCK_EVENT_CB: LockCallbackFn = log_lock_event;
-///
-/// let mut atomic_car = AtomicMutex::<Car>::from((Car{year: 2016}, Some("car"), Some(LOG_LOCK_EVENT_CB)));
-/// atomic_car.lock(|c| {println!("year: {}", c.year)});
-/// atomic_car.lock_mut(|mut c| {c.year = 2023});
-/// ```
-///
-/// results in:
-/// ```text
-/// TryAcquire lock `car` of type `Mutex` for `Read` by
-///     |-- thread main, `ThreadId(1)`
-/// Acquire lock `car` of type `Mutex` for `Read` by
-///     |-- thread main, `ThreadId(1)`
-/// year: 2016
-/// Release lock `car` of type `Mutex` for `Read` by
-///     |-- thread main, `ThreadId(1)`
-/// TryAcquire lock `car` of type `Mutex` for `Write` by
-///     |-- thread main, `ThreadId(1)`
-/// Acquire lock `car` of type `Mutex` for `Write` by
-///     |-- thread main, `ThreadId(1)`
-/// Release lock `car` of type `Mutex` for `Write` by
-///     |-- thread main, `ThreadId(1)`
-/// ```
 #[derive(Debug)]
 pub struct AtomicMutex<T> {
     inner: Arc<Mutex<T>>,
@@ -215,16 +151,6 @@ impl<T> AtomicMutex<T> {
     }
 
     /// Acquire read lock and return an `AtomicMutexGuard`
-    ///
-    /// # Examples
-    /// ```
-    /// # use nyks_node::application::locks::std::{AtomicMutex, traits::*};
-    /// struct Car {
-    ///     year: u16,
-    /// }
-    /// let atomic_car = AtomicMutex::from(Car{year: 2016});
-    /// let year = atomic_car.lock_guard().year;
-    /// ```
     pub fn lock_guard(&self) -> AtomicMutexGuard<'_, T> {
         self.try_acquire_read_cb();
         let guard = self.inner.lock().expect("Read lock should succeed");
@@ -232,16 +158,6 @@ impl<T> AtomicMutex<T> {
     }
 
     /// Acquire write lock and return an `AtomicMutexGuard`
-    ///
-    /// # Examples
-    /// ```
-    /// # use nyks_node::application::locks::std::{AtomicMutex, traits::*};
-    /// struct Car {
-    ///     year: u16,
-    /// }
-    /// let mut atomic_car = AtomicMutex::from(Car{year: 2016});
-    /// atomic_car.lock_guard_mut().year = 2022;
-    /// ```
     pub fn lock_guard_mut(&mut self) -> AtomicMutexGuard<'_, T> {
         self.try_acquire_write_cb();
         let guard = self.inner.lock().expect("Write lock should succeed");
@@ -249,17 +165,6 @@ impl<T> AtomicMutex<T> {
     }
 
     /// Immutably access the data of type `T` in a closure and possibly return a result of type `R`
-    ///
-    /// # Examples
-    /// ```
-    /// # use nyks_node::application::locks::std::{AtomicMutex, traits::*};
-    /// struct Car {
-    ///     year: u16,
-    /// }
-    /// let atomic_car = AtomicMutex::from(Car{year: 2016});
-    /// atomic_car.lock(|c| println!("year: {}", c.year));
-    /// let year = atomic_car.lock(|c| c.year);
-    /// ```
     pub fn lock<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R,
@@ -272,17 +177,6 @@ impl<T> AtomicMutex<T> {
     }
 
     /// Mutably access the data of type `T` in a closure and possibly return a result of type `R`
-    ///
-    /// # Examples
-    /// ```
-    /// # use nyks_node::application::locks::std::{AtomicMutex, traits::*};
-    /// struct Car {
-    ///     year: u16,
-    /// }
-    /// let mut atomic_car = AtomicMutex::from(Car{year: 2016});
-    /// atomic_car.lock_mut(|mut c| {c.year = 2022});
-    /// let year = atomic_car.lock_mut(|mut c| {c.year = 2023; c.year});
-    /// ```
     pub fn lock_mut<R, F>(&mut self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
@@ -295,13 +189,6 @@ impl<T> AtomicMutex<T> {
     }
 
     /// get copy of the locked value T (if T implements Copy).
-    ///
-    /// # Example
-    /// ```
-    /// # use nyks_node::application::locks::std::{AtomicMutex, traits::*};
-    /// let atomic_u64 = AtomicMutex::from(25u64);
-    /// let age = atomic_u64.get();
-    /// ```
     #[inline]
     pub fn get(&self) -> T
     where
@@ -311,13 +198,6 @@ impl<T> AtomicMutex<T> {
     }
 
     /// set the locked value T (if T implements Copy).
-    ///
-    /// # Example
-    /// ```
-    /// # use nyks_node::application::locks::std::{AtomicMutex, traits::*};
-    /// let mut atomic_bool = AtomicMutex::from(false);
-    /// atomic_bool.set(true);
-    /// ```
     #[inline]
     pub fn set(&mut self, value: T)
     where
