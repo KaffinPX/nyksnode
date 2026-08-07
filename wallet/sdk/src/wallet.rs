@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use num_traits::CheckedSub;
 use nyks_consensus::block::block_height::BlockHeight;
 use nyks_consensus::network::Network;
 use nyks_consensus::proof_abstractions::timestamp::Timestamp;
@@ -151,12 +152,19 @@ impl Wallet {
         self.utxos.read().await.utxo_count()
     }
 
-    pub async fn spendable_balance(&self) -> NativeCurrencyAmount {
-        self.utxos.read().await.spendable_balance()
-    }
-
     pub async fn total_balance(&self) -> NativeCurrencyAmount {
         self.utxos.read().await.total_balance()
+    }
+
+    pub async fn spendable_balance(&self) -> NativeCurrencyAmount {
+        let mempool_scanner = self.mempool_scanner.read().await;
+        let pending_spend_utxos = mempool_scanner.pending_spend_utxos();
+
+        let utxos = self.utxos.read().await;
+        let spendable = utxos.spendable_balance();
+        let outgoing = utxos.total_balance_from_utxos(pending_spend_utxos).await;
+
+        spendable.checked_sub(&outgoing).unwrap()
     }
 
     pub async fn unconfirmed_balance(&self) -> NativeCurrencyAmount {
