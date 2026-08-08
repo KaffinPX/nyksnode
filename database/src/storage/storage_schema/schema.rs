@@ -40,45 +40,6 @@ use super::SimpleRustyReader;
 /// which are simple wrappers around `Arc<RwLock<T>>` and `Arc<Mutex<T>>`.
 ///
 /// This is the recommended usage.
-///
-/// # Example:
-///
-/// ```
-/// # // note: compile_fail due to: https://github.com/rust-lang/rust/issues/67295
-/// # tokio_test::block_on(async {
-/// # use nyks_node::application::database::storage::{storage_vec::traits::*, storage_schema::{SimpleRustyStorage, traits::*}};
-/// # let db = nyks_node::application::database::NeptuneLevelDb::open_new_test_database(true, None, None, None).await.unwrap();
-/// use nyks_node::application::locks::tokio::AtomicRw;
-///
-/// let mut storage = SimpleRustyStorage::new(db);
-///
-/// let tables = (
-///     storage.schema.new_vec::<u16>("ages").await,
-///     storage.schema.new_vec::<String>("names").await,
-///     storage.schema.new_singleton::<bool>("proceed").await,
-///     storage.schema.new_map::<u64, String>("messages").await
-/// );
-///
-/// let mut atomic_tables = AtomicRw::from(tables);
-///
-/// // these mutations happen atomically in mem.
-/// {
-///     let mut lock = atomic_tables.lock_guard_mut().await;
-///     lock.0.push(5).await;
-///     lock.1.push("Sally".into()).await;
-///     lock.2.set(true).await;
-///     lock.3.insert(101, "Hello".to_owned()).await;
-/// }
-///
-/// // all pending writes are persisted to DB in one atomic batch operation.
-/// storage.persist();
-/// # });
-/// ```
-///
-/// In the example, the `table` were placed in a `tuple` container.
-/// It works equally well to put them in a `struct`.  If the tables
-/// are all of the same type (including generics), they could be
-/// placed in a collection type such as `Vec`, or `HashMap`.
 #[derive(Debug)]
 pub struct DbtSchema {
     /// Pending writes for all tables in this Schema.

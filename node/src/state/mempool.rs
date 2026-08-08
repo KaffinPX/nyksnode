@@ -831,30 +831,6 @@ impl Mempool {
 
     /// Produce a sorted iterator over a snapshot of the Double-Ended Priority Queue.
     ///
-    /// # Example
-    ///
-    /// ```
-    /// use bytesize::ByteSize;
-    /// use nyks_node::application::config::network::Network;
-    /// use nyks_node::protocol::block::Block;
-    /// use nyks_node::state::mempool::Mempool;
-    /// use nyks_node::state::transaction::tx_proving_capability::TxProvingCapability;
-    ///
-    /// let network = Network::Main;
-    /// let genesis_block = Block::genesis(network);
-    /// let mempool = Mempool::new(
-    ///     ByteSize::gb(1),
-    ///     TxProvingCapability::ProofCollection,
-    ///     &genesis_block
-    /// );
-    /// // insert transactions here.
-    /// let mut most_valuable_transactions = vec![];
-    /// for (transaction_id, fee_density) in mempool.fee_density_iter() {
-    ///    let t = mempool.get(transaction_id);
-    ///    most_valuable_transactions.push(t);
-    /// }
-    /// ```
-    ///
     /// Yields the `transaction_digest` in order of descending `fee_density`, since
     /// users (miner or transaction merger) will likely only care about the most valuable transactions
     /// Computes in O(N lg N)

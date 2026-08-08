@@ -173,7 +173,7 @@ impl Timestamp {
     /// # Examples
     ///
     /// ```
-    /// use nyks_node::api::export::Timestamp;
+    /// use nyks_consensus::proof_abstractions::timestamp::Timestamp;
     ///
     /// let timestamp = Timestamp::millis(1234567*1000);
     /// assert_eq!(timestamp.format_human_duration(), "2 weeks, 6 hours, 56 minutes, 7 seconds");

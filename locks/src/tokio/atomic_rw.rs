@@ -24,73 +24,6 @@ use super::LockEvent;
 use super::LockType;
 
 /// An `Arc<RwLock<T>>` wrapper to make data thread-safe and easy to work with.
-///
-/// # Examples
-/// ```
-/// # use nyks_node::application::locks::tokio::AtomicRw;
-/// struct Car {
-///     year: u16,
-/// };
-/// # tokio_test::block_on(async {
-/// let mut atomic_car = AtomicRw::from(Car{year: 2016});
-/// atomic_car.lock(|c| {println!("year: {}", c.year)}).await;
-/// atomic_car.lock_mut(|mut c| {c.year = 2023}).await;
-/// # })
-/// ```
-///
-/// It is also possible to provide a name and callback fn/// during instantiation.  In this way, the application
-/// can easily trace lock acquisitions.
-///
-/// # Examples
-/// ```
-/// # use nyks_node::application::locks::tokio::{AtomicRw, LockEvent, LockCallbackFn};
-/// struct Car {
-///     year: u16,
-/// };
-///
-/// pub fn log_lock_event(lock_event: LockEvent) {
-///     let (event, info, acquisition) =
-///     match lock_event {
-///         LockEvent::TryAcquire{info, acquisition, ..} => ("TryAcquire", info, acquisition),
-///         LockEvent::Acquire{info, acquisition, ..} => ("Acquire", info, acquisition),
-///         LockEvent::Release{info, acquisition, ..} => ("Release", info, acquisition),
-///     };
-///
-///     println!(
-///         "{} lock `{}` of type `{}` for `{}` by\n\t|-- thread {}, `{:?}`",
-///         event,
-///         info.name().unwrap_or("?"),
-///         info.lock_type(),
-///         acquisition,
-///         std::thread::current().name().unwrap_or("?"),
-///         std::thread::current().id(),
-///     );
-/// }
-/// const LOG_TOKIO_LOCK_EVENT_CB: LockCallbackFn = log_lock_event;
-///
-/// # tokio_test::block_on(async {
-/// let mut atomic_car = AtomicRw::<Car>::from((Car{year: 2016}, Some("car"), Some(LOG_TOKIO_LOCK_EVENT_CB)));
-/// atomic_car.lock(|c| {println!("year: {}", c.year)}).await;
-/// atomic_car.lock_mut(|mut c| {c.year = 2023}).await;
-/// # })
-/// ```
-///
-/// results in:
-/// ```text
-/// TryAcquire lock `car` of type `RwLock` for `Read` by
-///     |-- thread main, `ThreadId(1)`
-/// Acquire lock `car` of type `RwLock` for `Read` by
-///     |-- thread main, `ThreadId(1)`
-/// year: 2016
-/// Release lock `car` of type `RwLock` for `Read` by
-///     |-- thread main, `ThreadId(1)`
-/// TryAcquire lock `car` of type `RwLock` for `Write` by
-///     |-- thread main, `ThreadId(1)`
-/// Acquire lock `car` of type `RwLock` for `Write` by
-///     |-- thread main, `ThreadId(1)`
-/// Release lock `car` of type `RwLock` for `Write` by
-///     |-- thread main, `ThreadId(1)`
-/// ```
 #[derive(Debug)]
 pub struct AtomicRw<T> {
     inner: Arc<RwLock<T>>,
@@ -213,18 +146,6 @@ impl<T> From<AtomicRw<T>> for Arc<RwLock<T>> {
 // can be used without caller having to use the trait.
 impl<T> AtomicRw<T> {
     /// Acquire read lock and return an `AtomicRwReadGuard`
-    ///
-    /// # Examples
-    /// ```
-    /// # use nyks_node::application::locks::tokio::AtomicRw;
-    /// struct Car {
-    ///     year: u16,
-    /// };
-    /// # tokio_test::block_on(async {
-    /// let atomic_car = AtomicRw::from(Car{year: 2016});
-    /// let year = atomic_car.lock_guard().await.year;
-    /// # })
-    ///```
     #[cfg_attr(feature = "track-lock-location", track_caller)]
     pub async fn lock_guard(&self) -> AtomicRwReadGuard<'_, T> {
         self.try_acquire_read_cb();
@@ -235,18 +156,6 @@ impl<T> AtomicRw<T> {
     }
 
     /// Acquire write lock and return an `AtomicRwWriteGuard`
-    ///
-    /// # Examples
-    /// ```
-    /// # use nyks_node::application::locks::tokio::AtomicRw;
-    /// struct Car {
-    ///     year: u16,
-    /// };
-    /// # tokio_test::block_on(async {
-    /// let mut atomic_car = AtomicRw::from(Car{year: 2016});
-    /// atomic_car.lock_guard_mut().await.year = 2022;
-    /// # })
-    /// ```
     #[cfg_attr(feature = "track-lock-location", track_caller)]
     pub async fn lock_guard_mut(&mut self) -> AtomicRwWriteGuard<'_, T> {
         self.try_acquire_write_cb();
@@ -290,19 +199,6 @@ impl<T> AtomicRw<T> {
     }
 
     /// Immutably access the data of type `T` in a closure and possibly return a result of type `R`
-    ///
-    /// # Examples
-    /// ```
-    /// # use nyks_node::application::locks::tokio::AtomicRw;
-    /// struct Car {
-    ///     year: u16,
-    /// };
-    /// # tokio_test::block_on(async {
-    /// let atomic_car = AtomicRw::from(Car{year: 2016});
-    /// atomic_car.lock(|c| println!("year: {}", c.year)).await;
-    /// let year = atomic_car.lock(|c| c.year).await;
-    /// })
-    /// ```
     #[cfg_attr(feature = "track-lock-location", track_caller)]
     pub async fn lock<R, F>(&self, f: F) -> R
     where
@@ -317,19 +213,6 @@ impl<T> AtomicRw<T> {
     }
 
     /// Mutably access the data of type `T` in a closure and possibly return a result of type `R`
-    ///
-    /// # Examples
-    /// ```
-    /// # use nyks_node::application::locks::tokio::AtomicRw;
-    /// struct Car {
-    ///     year: u16,
-    /// };
-    /// # tokio_test::block_on(async {
-    /// let mut atomic_car = AtomicRw::from(Car{year: 2016});
-    /// atomic_car.lock_mut(|mut c| c.year = 2022).await;
-    /// let year = atomic_car.lock_mut(|mut c| {c.year = 2023; c.year}).await;
-    /// })
-    /// ```
     #[cfg_attr(feature = "track-lock-location", track_caller)]
     pub async fn lock_mut<R, F>(&mut self, f: F) -> R
     where
@@ -348,21 +231,6 @@ impl<T> AtomicRw<T> {
     ///
     /// The async callback uses dynamic dispatch and it is necessary to call
     /// `.boxed()` on the closure's async block and have [`FutureExt`](futures::future::FutureExt) in scope.
-    ///
-    /// # Examples
-    /// ```
-    /// # use nyks_node::application::locks::tokio::AtomicRw;
-    /// # use futures::future::FutureExt;
-    /// struct Car {
-    ///     year: u16,
-    /// };
-    /// # tokio_test::block_on(async {
-    /// let atomic_car = AtomicRw::from(Car{year: 2016});
-    /// atomic_car.lock_async(|c| async {println!("year: {}", c.year)}.boxed()).await;
-    /// let year = atomic_car.lock_async(|c| async {c.year}.boxed()).await;
-    /// })
-    /// ```
-    // design background: https://stackoverflow.com/a/77657788/10087197
     #[cfg_attr(feature = "track-lock-location", track_caller)]
     pub async fn lock_async<R>(&self, f: impl FnOnce(&T) -> BoxFuture<'_, R>) -> R {
         self.try_acquire_read_cb();
@@ -377,21 +245,6 @@ impl<T> AtomicRw<T> {
     ///
     /// The async callback uses dynamic dispatch and it is necessary to call
     /// `.boxed()` on the closure's async block and have [`FutureExt`](futures::future::FutureExt) in scope.
-    ///
-    /// # Examples
-    /// ```
-    /// # use nyks_node::application::locks::tokio::AtomicRw;
-    /// # use futures::future::FutureExt;
-    /// struct Car {
-    ///     year: u16,
-    /// };
-    /// # tokio_test::block_on(async {
-    /// let mut atomic_car = AtomicRw::from(Car{year: 2016});
-    /// atomic_car.lock_mut_async(|mut c| async {c.year = 2022}.boxed()).await;
-    /// let year = atomic_car.lock_mut_async(|mut c| async {c.year = 2023; c.year}.boxed()).await;
-    /// })
-    /// ```
-    // design background: https://stackoverflow.com/a/77657788/10087197
     #[cfg_attr(feature = "track-lock-location", track_caller)]
     pub async fn lock_mut_async<R>(&mut self, f: impl FnOnce(&mut T) -> BoxFuture<'_, R>) -> R {
         self.try_acquire_write_cb();

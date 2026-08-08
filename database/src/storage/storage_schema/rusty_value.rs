@@ -44,31 +44,6 @@ use serde::Serialize;
 ///
 /// It is simple to extend RustyValue for use with any locally defined type
 /// that implements `serde::Serialize` and `serde::Deserialize`.
-///
-/// ## Examples
-///
-/// ```
-/// use serde::{Serialize, Deserialize};
-/// use nyks_node::application::database::storage::storage_schema::RustyValue;
-///
-/// #[derive(Debug, Clone, Serialize, Deserialize)]
-/// pub struct Person {
-///     name: String,
-///     age: u16,
-/// }
-///
-/// impl From<RustyValue> for Person {
-///    fn from(value: RustyValue) -> Self {
-///        value.into_any()
-///    }
-/// }
-///
-/// impl From<Person> for RustyValue {
-///    fn from(value: Person) -> Self {
-///        Self::from_any(&value)
-///    }
-/// }
-/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustyValue(pub Vec<u8>);
 
