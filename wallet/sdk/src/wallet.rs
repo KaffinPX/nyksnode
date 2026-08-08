@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use num_traits::CheckedSub;
 use nyks_consensus::block::block_height::BlockHeight;
 use nyks_consensus::network::Network;
 use nyks_consensus::proof_abstractions::timestamp::Timestamp;
@@ -13,7 +14,6 @@ use nyks_standards::wallet::keys::address::Address;
 use nyks_standards::wallet::keys::address::Recipient;
 use nyks_standards::wallet::keys::key::KeyType;
 use nyks_standards::wallet::keys::key::Spender;
-
 use nyks_wallet_core::entropy::wallet_entropy::WalletEntropy;
 use nyks_wallet_core::transaction::builder::TransactionBuilder;
 use nyks_wallet_core::transaction::builder::output::TxOutput;
@@ -23,10 +23,11 @@ use tokio::sync::RwLock;
 
 use crate::scanners::chain::AdvanceError;
 use crate::scanners::chain::ChainScanner;
+use crate::scanners::mempool::MempoolScanner;
 use crate::state::address_book::AddressBook;
+use crate::state::utxos::MonitoredUtxo;
+use crate::state::utxos::UtxoKey;
 use crate::state::utxos::pool::UtxoPool;
-use crate::state::utxos::utxo::MonitoredUtxo;
-use crate::state::utxos::utxo::UtxoKey;
 
 const BATCH_SIZE: usize = 100;
 
@@ -39,12 +40,7 @@ pub enum SyncError {
     Advance(#[from] AdvanceError),
 }
 
-/// Events emitted by the wallet as a result of chain-sync activity.
-///
-/// This is intentionally an enum (rather than just returning the raw utxo
-/// pairs) so that future sync-driven activity (e.g. spent-utxo detection,
-/// reorgs, balance-threshold crossings, etc.) can be represented without
-/// changing the signature of `Wallet::sync`.
+/// Events emitted by the wallet as a result of sync and scan activity.
 #[derive(Debug, Clone)]
 pub enum WalletEvent {
     /// A new UTXO was discovered and added to the wallet's UTXO pool.
@@ -54,6 +50,14 @@ pub enum WalletEvent {
     /// invalid) while syncing membership proofs, and was evicted from the
     /// pool.
     UtxoInvalidated { key: UtxoKey, utxo: MonitoredUtxo },
+
+    /// A mempool transaction was found to spend one or more of the
+    /// wallet's UTXOs. Emitted once per transaction, the first time it's
+    /// observed as relevant.
+    UtxosOutgoing {
+        id: TransactionKernelId,
+        utxos: Vec<UtxoKey>,
+    },
 }
 
 impl WalletEvent {
@@ -64,6 +68,10 @@ impl WalletEvent {
     pub fn utxo_invalidated(key: UtxoKey, utxo: MonitoredUtxo) -> Self {
         WalletEvent::UtxoInvalidated { key, utxo }
     }
+
+    pub fn utxos_outgoing(id: TransactionKernelId, utxos: Vec<UtxoKey>) -> Self {
+        WalletEvent::UtxosOutgoing { id, utxos }
+    }
 }
 
 #[derive(Clone)]
@@ -71,6 +79,7 @@ pub struct Wallet {
     rpc: HttpClient,
     addresses: Arc<RwLock<AddressBook>>,
     scanner: Arc<RwLock<ChainScanner>>,
+    mempool_scanner: Arc<RwLock<MempoolScanner>>,
     utxos: Arc<RwLock<UtxoPool>>,
     pub network: Network,
 
@@ -88,15 +97,18 @@ impl Wallet {
         network: Network,
     ) -> Self {
         let addresses = AddressBook::new(entropy);
+        let utxos = UtxoPool::new(rpc.clone());
+
         let view_keys = addresses.view_keys().to_vec();
 
         Wallet {
-            rpc: rpc.clone(),
+            rpc,
             addresses: Arc::new(RwLock::new(addresses)),
             scanner: Arc::new(RwLock::new(ChainScanner::new(
                 height, None, view_keys, network,
             ))),
-            utxos: Arc::new(RwLock::new(UtxoPool::new(rpc))),
+            mempool_scanner: Arc::new(RwLock::new(MempoolScanner::new(utxos.index()))),
+            utxos: Arc::new(RwLock::new(utxos)),
             network,
             pending_events: Arc::new(RwLock::new(Vec::new())),
         }
@@ -109,7 +121,7 @@ impl Wallet {
         let mut utxos_pool = self.utxos.write().await;
 
         for utxo in utxos {
-            let is_unique = utxos_pool.import_utxo(utxo);
+            let is_unique = utxos_pool.import_utxo(utxo).await;
             assert!(is_unique);
         }
     }
@@ -140,16 +152,34 @@ impl Wallet {
         self.utxos.read().await.utxo_count()
     }
 
-    pub async fn spendable_balance(&self) -> NativeCurrencyAmount {
-        self.utxos.read().await.spendable_balance()
-    }
-
     pub async fn total_balance(&self) -> NativeCurrencyAmount {
         self.utxos.read().await.total_balance()
     }
 
+    pub async fn spendable_balance(&self) -> NativeCurrencyAmount {
+        let mempool_scanner = self.mempool_scanner.read().await;
+        let pending_spend_utxos = mempool_scanner.pending_spend_utxos();
+
+        let utxos = self.utxos.read().await;
+        let spendable = utxos.spendable_balance();
+        let outgoing = utxos.total_balance_from_utxos(pending_spend_utxos).await;
+
+        spendable.checked_sub(&outgoing).unwrap()
+    }
+
     pub async fn unconfirmed_balance(&self) -> NativeCurrencyAmount {
         self.scanner.read().await.unconfirmed_balance()
+    }
+
+    pub async fn outgoing_balance(&self) -> NativeCurrencyAmount {
+        let mempool_scanner = self.mempool_scanner.read().await;
+        let utxos = mempool_scanner.pending_spend_utxos();
+
+        self.utxos
+            .read()
+            .await
+            .total_balance_from_utxos(utxos)
+            .await
     }
 
     /// Sync wallet forward by at most `BATCH_SIZE` blocks.
@@ -167,12 +197,35 @@ impl Wallet {
     pub async fn sync(&self) -> Result<Vec<WalletEvent>, SyncError> {
         let network_height = self.rpc.height().await.unwrap().height;
 
+        let mut events = self.drain_pending_events().await;
+
+        events.extend(self.sync_mempool().await);
+
+        if let Some(chain_events) = self.sync_chain(network_height).await? {
+            events.extend(chain_events);
+        }
+
+        Ok(events)
+    }
+
+    /// Advances the chain scanner by at most `BATCH_SIZE` blocks (up to
+    /// `network_height`) and updates the UTXO pool with any newly confirmed
+    /// UTXOs.
+    ///
+    /// Returns `None` if the scanner is already caught up to
+    /// `network_height`, in which case there is nothing to do. Otherwise
+    /// returns the `UtxoReceived` events discovered in this batch (which may
+    /// be empty).
+    async fn sync_chain(
+        &self,
+        network_height: BlockHeight,
+    ) -> Result<Option<Vec<WalletEvent>>, SyncError> {
         // Use scan_tip (including unconfirmed blocks) for both the check and the start height.
         let scan_tip = {
             let scanner = self.scanner.read().await;
             let tip = scanner.tip_height();
             if tip >= network_height {
-                return Ok(self.drain_pending_events().await);
+                return Ok(None);
             }
             tip
         };
@@ -198,13 +251,47 @@ impl Wallet {
             utxos.add_utxos(confirmed).await
         };
 
-        let mut events = self.drain_pending_events().await;
-        events.extend(
+        Ok(Some(
             keys.into_iter()
-                .map(|(key, utxo)| WalletEvent::utxo_received(key, utxo)),
-        );
+                .map(|(key, utxo)| WalletEvent::utxo_received(key, utxo))
+                .collect(),
+        ))
+    }
 
-        Ok(events)
+    /// Fetches the current mempool's transactions and feeds their kernels
+    /// to the mempool scanner.
+    async fn sync_mempool(&self) -> Vec<WalletEvent> {
+        let mempool_txs = self.rpc.transactions().await.unwrap().transactions;
+        let ids_to_fetch = self
+            .mempool_scanner
+            .read()
+            .await
+            .ids_to_fetch(&mempool_txs)
+            .await;
+
+        let mut kernels = Vec::with_capacity(ids_to_fetch.len());
+        for id in ids_to_fetch {
+            let kernel = self
+                .rpc
+                .get_transaction_kernel(id.clone())
+                .await
+                .unwrap()
+                .kernel;
+            if let Some(kernel) = kernel {
+                kernels.push((id, kernel));
+            }
+        }
+
+        let mut mempool_scanner = self.mempool_scanner.write().await;
+        let outgoing_utxos = mempool_scanner.scan(kernels).await;
+
+        // keep cache from growing unbounded as txs leave the mempool
+        mempool_scanner.evict_stale(mempool_txs).await;
+
+        outgoing_utxos
+            .into_iter()
+            .map(|(id, utxos)| WalletEvent::utxos_outgoing(id, utxos))
+            .collect()
     }
 
     /// Takes and returns all events queued by other operations (e.g. `send`)
@@ -226,12 +313,20 @@ impl Wallet {
         fee: NativeCurrencyAmount,
     ) -> Result<TransactionKernelId, RpcError> {
         let height = self.tip_height().await;
+        let timestamp = Timestamp::now();
 
         // Generate "spendable" UTXOs and prepare them for spending.
-        let timestamp = Timestamp::now();
         let mut utxos = self.utxos.write().await;
-        let selection = utxos.select_utxos(amount + fee, timestamp).await;
-        drop(utxos);
+        let excluded_utxos = self
+            .mempool_scanner
+            .read()
+            .await
+            .pending_spend_utxos()
+            .copied()
+            .collect();
+        let selection = utxos
+            .select_utxos(amount + fee, timestamp, Some(excluded_utxos))
+            .await;
 
         if !selection.invalidated_utxos.is_empty() {
             let mut pending = self.pending_events.write().await;

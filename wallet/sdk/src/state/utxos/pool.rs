@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use num_traits::CheckedSub;
 use num_traits::Zero;
@@ -10,10 +11,11 @@ use nyks_rpc_client::RpcApi;
 use nyks_rpc_client::http::HttpClient;
 use nyks_rpc_client::wallet::mutator_set::RpcMsMembershipProofPrivacyPreserving;
 
-use crate::state::utxos::utxo::IncomingUtxo;
-use crate::state::utxos::utxo::MonitoredUtxo;
-use crate::state::utxos::utxo::MonitoredUtxoStatus;
-use crate::state::utxos::utxo::UtxoKey;
+use crate::state::utxos::IncomingUtxo;
+use crate::state::utxos::MonitoredUtxo;
+use crate::state::utxos::MonitoredUtxoStatus;
+use crate::state::utxos::UtxoKey;
+use crate::state::utxos::index::UtxoIndex;
 
 /// Max index sets per `restore_membership_proof` call.
 const RESTORE_BATCH_LIMIT: usize = 128;
@@ -25,6 +27,7 @@ const RESTORE_BATCH_LIMIT: usize = 128;
 pub struct UtxoPool {
     pub rpc: HttpClient,
     pub utxos: HashMap<UtxoKey, MonitoredUtxo>,
+    pub index: UtxoIndex,
 }
 
 /// Result of [`UtxoPool::select_utxos`].
@@ -47,12 +50,22 @@ impl UtxoPool {
         UtxoPool {
             rpc,
             utxos: HashMap::new(),
+            index: UtxoIndex::new(),
         }
     }
 
+    /// Shared handle to this pool's index, for callers (e.g. `MempoolScanner`)
+    /// that only need index lookups, not full pool access.
+    pub fn index(&self) -> UtxoIndex {
+        self.index.clone()
+    }
+
     /// Returns true if it was a new UTXO
-    pub fn import_utxo(&mut self, utxo: MonitoredUtxo) -> bool {
-        self.utxos.insert(UtxoKey::new(&utxo), utxo).is_none()
+    pub async fn import_utxo(&mut self, utxo: MonitoredUtxo) -> bool {
+        let key = UtxoKey::new(&utxo);
+
+        self.index.insert(utxo.indices(), key).await;
+        self.utxos.insert(key, utxo).is_none()
     }
 
     /// Ingests UTXOs, restoring proofs only for the new ones.
@@ -77,9 +90,11 @@ impl UtxoPool {
                 )
                 .unwrap();
             let utxo = utxo.finalize(utxo_msmp);
-            let utxo_key = UtxoKey::new(&utxo);
 
-            self.utxos.insert(utxo_key.clone(), utxo.clone());
+            let utxo_key = UtxoKey::new(&utxo);
+            self.index.insert(utxo.indices(), utxo_key).await;
+            self.utxos.insert(utxo_key, utxo.clone());
+
             added_utxos.push((utxo_key, utxo));
         }
 
@@ -89,6 +104,9 @@ impl UtxoPool {
     /// Greedily selects UTXOs covering `amount`, syncing only the selected
     /// ones against current chain state.
     ///
+    /// UTXOs whose keys appear in `exclude` are skipped entirely, e.g. ones
+    /// already committed to another in-flight transaction.
+    ///
     /// Spent UTXOs are evicted and selection retries against the rest; all
     /// evictions are collected and returned. Every returned UTXO is valid
     /// against the returned `msa`.
@@ -96,6 +114,7 @@ impl UtxoPool {
         &mut self,
         amount: NativeCurrencyAmount,
         timestamp: Timestamp,
+        exclude: Option<HashSet<UtxoKey>>,
     ) -> UtxosSelection {
         let mut invalidated_utxos = Vec::new();
 
@@ -108,6 +127,10 @@ impl UtxoPool {
             for (key, utxo) in self.utxos.iter() {
                 if total_amount >= amount {
                     break;
+                }
+
+                if exclude.as_ref().is_some_and(|e| e.contains(key)) {
+                    continue;
                 }
 
                 if !utxo.can_spend_at(timestamp) {
@@ -171,8 +194,9 @@ impl UtxoPool {
             // Drop spent UTXOs and retry against what remains.
             for key in spent_utxos {
                 let mut utxo = self.utxos.remove(&key).expect("key was just selected");
-                utxo.status = MonitoredUtxoStatus::SpentInUnknownBlock;
+                self.index.remove(&utxo.indices()).await;
 
+                utxo.status = MonitoredUtxoStatus::SpentInUnknownBlock;
                 invalidated_utxos.push((key, utxo));
             }
         }
@@ -209,6 +233,17 @@ impl UtxoPool {
         }
 
         total_amount
+    }
+
+    /// Sums the amounts of UTXOs matching the given utxo keys
+    pub async fn total_balance_from_utxos<'a>(
+        &self,
+        utxos: impl Iterator<Item = &'a UtxoKey>,
+    ) -> NativeCurrencyAmount {
+        utxos
+            .filter_map(|key| self.utxos.get(key))
+            .map(|utxo| utxo.get_native_currency_amount())
+            .fold(NativeCurrencyAmount::zero(), |acc, amt| acc + amt)
     }
 
     /// Calls `restore_membership_proof` in chunks of at most

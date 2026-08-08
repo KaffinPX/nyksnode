@@ -181,6 +181,7 @@ impl SyncLoop {
                         }
                         SuccessorsToSync::BlockValidationError => {
                             tracing::error!("Block validation error occurred during syncing. Possible cause: a reorg happened while syncing. Terminating sync loop.");
+                            break;
                         }
                     }
 

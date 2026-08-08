@@ -2,12 +2,19 @@ use std::collections::HashMap;
 use std::fmt::Display;
 
 use itertools::Itertools;
+use nyks_consensus::block::mutator_set_update::MutatorSetUpdate;
+use nyks_consensus::mutator_set::authenticated_item::AuthenticatedItem;
+use nyks_consensus::mutator_set::ms_membership_proof::MsMembershipProof;
+use nyks_consensus::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
+use nyks_consensus::mutator_set::removal_record::RemovalRecord;
 use nyks_consensus::prelude::tasm_lib::prelude::Tip5;
 use nyks_consensus::proof_abstractions::SecretWitness;
+use nyks_consensus::proof_abstractions::mast_hash::MastHash;
 use nyks_consensus::proof_abstractions::tasm::program::TritonProgram;
 use nyks_consensus::tasm_lib::prelude::Digest;
 use nyks_consensus::transaction::lock_script::LockScriptAndWitness;
 use nyks_consensus::transaction::salted_utxos::SaltedUtxos;
+use nyks_consensus::transaction::transaction_kernel::TransactionKernel;
 use nyks_consensus::transaction::transaction_kernel::TransactionKernelField;
 use nyks_consensus::transaction::transaction_kernel::TransactionKernelModifier;
 use nyks_consensus::transaction::utxo::Utxo;
@@ -24,27 +31,19 @@ use nyks_consensus::triton_vm::error::ProvingError;
 use nyks_consensus::triton_vm::prelude::BFieldCodec;
 use nyks_consensus::triton_vm::vm::PublicInput;
 use nyks_consensus::triton_vm::vm::VM;
+use nyks_consensus::type_scripts::TypeScriptAndWitness;
+use nyks_consensus::type_scripts::known_type_scripts;
+use nyks_consensus::type_scripts::known_type_scripts::match_type_script_and_generate_witness;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 use serde::Deserialize;
 use serde::Serialize;
 use thiserror::Error;
-use tracing::info;
+use tracing::warn;
 
 use crate::transaction::BuilderTransaction;
 use crate::transaction::BuilderTransactionProof;
 use crate::transaction::builder::input::TxInputList;
-use nyks_consensus::block::mutator_set_update::MutatorSetUpdate;
-use nyks_consensus::mutator_set::authenticated_item::AuthenticatedItem;
-use nyks_consensus::mutator_set::ms_membership_proof::MsMembershipProof;
-use nyks_consensus::mutator_set::mutator_set_accumulator::MutatorSetAccumulator;
-use nyks_consensus::mutator_set::removal_record::RemovalRecord;
-use nyks_consensus::proof_abstractions::mast_hash::MastHash;
-use nyks_consensus::transaction::transaction_kernel::TransactionKernel;
-use nyks_consensus::type_scripts::TypeScriptAndWitness;
-use nyks_consensus::type_scripts::known_type_scripts;
-use nyks_consensus::type_scripts::known_type_scripts::match_type_script_and_generate_witness;
-use tracing::warn;
 
 /// enumerates possible witness validation errors
 #[derive(Debug, Clone, Error, Serialize, Deserialize)]
@@ -91,10 +90,45 @@ pub enum WitnessValidationError {
 
     #[error("Primitive-witness backed transaction cannot have a set merge bit")]
     MergeBitSet,
+}
 
-    // catch-all error, eg for anyhow errors
-    #[error("transaction could not be created.  reason: {0}")]
-    Failed(String),
+/// Identifies which sub-proof is being generated.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProvingStage {
+    RemovalRecordsIntegrity,
+    CollectLockScripts,
+    KernelToOutputs,
+    CollectTypeScripts,
+    LockScript {
+        index: usize,
+        total: usize,
+        program_hash: Digest,
+    },
+    TypeScript {
+        index: usize,
+        total: usize,
+        program_hash: Digest,
+        name: String,
+    },
+}
+
+impl Display for ProvingStage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ProvingStage::RemovalRecordsIntegrity => write!(f, "RemovalRecordsIntegrity"),
+            ProvingStage::CollectLockScripts => write!(f, "CollectLockScripts"),
+            ProvingStage::KernelToOutputs => write!(f, "KernelToOutputs"),
+            ProvingStage::CollectTypeScripts => write!(f, "CollectTypeScripts"),
+            ProvingStage::LockScript { index, total, .. } => {
+                write!(f, "Lock script {}/{}", index + 1, total)
+            }
+            ProvingStage::TypeScript {
+                index, total, name, ..
+            } => {
+                write!(f, "Type script {}/{} ({name})", index + 1, total)
+            }
+        }
+    }
 }
 
 /// The raw witness is the most primitive type of transaction witness.
@@ -223,6 +257,12 @@ impl PrimitiveWitness {
     /// Verify the transaction directly from primitive witness
     ///
     /// (without proofs or decomposing into subclaims).
+    ///
+    /// # Panics
+    /// Panics if a spawned blocking task for lock- or type-script
+    /// verification fails to run to completion (e.g. it panicked). This
+    /// indicates a bug in the VM or runtime rather than an invalid witness,
+    /// so it is not represented as a [`WitnessValidationError`].
     #[cfg(not(target_arch = "wasm32"))]
     pub async fn validate(&self) -> Result<(), WitnessValidationError> {
         for lock_script_and_witness in &self.lock_scripts_and_witnesses {
@@ -233,17 +273,11 @@ impl PrimitiveWitness {
             // This could be a lengthy, CPU intensive call.
             // Also, the lock script is satisfied if it halts gracefully (i.e., without crashing).
             // The output is irrelevant.
-            let result = tokio::task::spawn_blocking(move || {
+            let run_res = tokio::task::spawn_blocking(move || {
                 VM::run(lock_script.clone(), public_input, secret_input)
             })
-            .await;
-
-            let Ok(run_res) = result else {
-                let reason = "Failed to spawn task for verifying lock script.";
-                let error = WitnessValidationError::Failed(reason.into());
-                warn!("{}", error);
-                return Err(error);
-            };
+            .await
+            .expect("spawned task for verifying lock script should not panic");
 
             if let Err(_e) = run_res {
                 // tbd: should we include the VMerror in InvalidLockScript error?
@@ -335,17 +369,11 @@ impl PrimitiveWitness {
 
             // Like above: potentially lengthy, CPU intensive call, only thing that matters
             // is error-free completion.
-            let result = tokio::task::spawn_blocking(move || {
+            let run_res = tokio::task::spawn_blocking(move || {
                 VM::run(type_script, public_input, nondeterminism)
             })
-            .await;
-
-            let Ok(run_res) = result else {
-                let reason = "Failed to spawn task for verifying type script.";
-                let error = WitnessValidationError::Failed(reason.into());
-                warn!("{}", error);
-                return Err(error);
-            };
+            .await
+            .expect("spawned task for verifying type script should not panic");
 
             if let Err(vm_error) = run_res {
                 // tbd: should we include the VMError in InvalidTypeScript error?
@@ -464,29 +492,14 @@ impl PrimitiveWitness {
         primitive_witness
     }
 
-    fn extract_specific_witnesses(
-        &self,
-    ) -> (
-        RemovalRecordsIntegrityWitness,
-        CollectLockScriptsWitness,
-        KernelToOutputsWitness,
-        CollectTypeScriptsWitness,
-    ) {
-        // collect witnesses
-        let removal_records_integrity_witness = RemovalRecordsIntegrityWitness::from(self);
-        let collect_lock_scripts_witness = CollectLockScriptsWitness::from(self);
-        let kernel_to_outputs_witness = KernelToOutputsWitness::from(self);
-        let collect_type_scripts_witness = CollectTypeScriptsWitness::from(self);
-
-        (
-            removal_records_integrity_witness,
-            collect_lock_scripts_witness,
-            kernel_to_outputs_witness,
-            collect_type_scripts_witness,
-        )
+    pub fn prove(&self) -> Result<ProofCollection, ProvingError> {
+        self.prove_with_progress(|_| {})
     }
 
-    pub fn prove(&self) -> Result<ProofCollection, ProvingError> {
+    pub fn prove_with_progress(
+        &self,
+        mut on_progress: impl FnMut(ProvingStage),
+    ) -> Result<ProofCollection, ProvingError> {
         // TODO: potentially add a way to show progress of proving...
         let (
             removal_records_integrity_witness,
@@ -500,42 +513,53 @@ impl PrimitiveWitness {
         let salted_inputs_hash = Tip5::hash(&self.input_utxos);
         let salted_outputs_hash = Tip5::hash(&self.output_utxos);
 
-        info!("Starting proving of {:x}...", txk_mast_hash);
-        info!("Proving RemovalRecordsIntegrity (1/6)...");
-
+        on_progress(ProvingStage::RemovalRecordsIntegrity);
         let removal_records_integrity = RemovalRecordsIntegrity.prove(
             removal_records_integrity_witness.claim(),
             removal_records_integrity_witness.nondeterminism(),
         )?;
 
-        info!("Proving CollectLockScripts (2/6)...");
+        on_progress(ProvingStage::CollectLockScripts);
         let collect_lock_scripts = CollectLockScripts.prove(
             collect_lock_scripts_witness.claim(),
             collect_lock_scripts_witness.nondeterminism(),
         )?;
 
-        info!("Proving KernelToOutputs (3/6)...");
+        on_progress(ProvingStage::KernelToOutputs);
         let kernel_to_outputs = KernelToOutputs.prove(
             kernel_to_outputs_witness.claim(),
             kernel_to_outputs_witness.nondeterminism(),
         )?;
 
-        info!("Proving CollectTypeScripts (4/6)...");
+        on_progress(ProvingStage::CollectTypeScripts);
         let collect_type_scripts = CollectTypeScripts.prove(
             collect_type_scripts_witness.claim(),
             collect_type_scripts_witness.nondeterminism(),
         )?;
 
-        info!("Proving lock scripts (5/6)...");
+        let lock_scripts_len = self.lock_scripts_and_witnesses.len();
         let mut lock_scripts_halt = vec![];
-        for lock_script_and_witness in &self.lock_scripts_and_witnesses {
+
+        for (i, lock_script_and_witness) in self.lock_scripts_and_witnesses.iter().enumerate() {
+            on_progress(ProvingStage::LockScript {
+                index: i,
+                total: lock_scripts_len,
+                program_hash: lock_script_and_witness.program.hash(),
+            });
             lock_scripts_halt.push(lock_script_and_witness.prove(txk_mast_hash_as_input.clone())?);
         }
 
-        info!("Proving type scripts (6/6)...");
+        let type_scripts_len = self.type_scripts_and_witnesses.len();
         let mut type_scripts_halt = vec![];
+
         for (i, tsaw) in self.type_scripts_and_witnesses.iter().enumerate() {
-            info!("Proving type script {i}: {:x}.", tsaw.program.hash());
+            let hash = tsaw.program.hash();
+            on_progress(ProvingStage::TypeScript {
+                index: i,
+                total: type_scripts_len,
+                program_hash: tsaw.program.hash(),
+                name: known_type_scripts::typescript_name(hash).to_owned(),
+            });
             type_scripts_halt.push(tsaw.prove(
                 txk_mast_hash,
                 salted_inputs_hash,
@@ -569,6 +593,28 @@ impl PrimitiveWitness {
             salted_outputs_hash,
             merge_bit_mast_path,
         })
+    }
+
+    fn extract_specific_witnesses(
+        &self,
+    ) -> (
+        RemovalRecordsIntegrityWitness,
+        CollectLockScriptsWitness,
+        KernelToOutputsWitness,
+        CollectTypeScriptsWitness,
+    ) {
+        // collect witnesses
+        let removal_records_integrity_witness = RemovalRecordsIntegrityWitness::from(self);
+        let collect_lock_scripts_witness = CollectLockScriptsWitness::from(self);
+        let kernel_to_outputs_witness = KernelToOutputsWitness::from(self);
+        let collect_type_scripts_witness = CollectTypeScriptsWitness::from(self);
+
+        (
+            removal_records_integrity_witness,
+            collect_lock_scripts_witness,
+            kernel_to_outputs_witness,
+            collect_type_scripts_witness,
+        )
     }
 }
 

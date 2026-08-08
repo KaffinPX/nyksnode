@@ -110,7 +110,7 @@ impl MutatorSetAccumulator {
         let batch_index = self.get_batch_index();
         (
             batch_index,
-            batch_index + u64::from(WINDOW_SIZE / CHUNK_SIZE),
+            batch_index + u64::from(WINDOW_SIZE / CHUNK_SIZE) - 1,
         )
     }
 
