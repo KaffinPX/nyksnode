@@ -7,7 +7,7 @@ use sha3::Shake256;
 use sha3::digest::ExtendableOutput;
 use sha3::digest::Update;
 
-use crate::wallet::notes::utxo_notification::UtxoNotificationPayload;
+use crate::wallet::notes::content::NoteContent;
 
 pub mod address;
 pub mod key;
@@ -29,17 +29,22 @@ pub(crate) fn network_hrp_char(network: Network) -> char {
 /// reuse proofs for tests. These values are used in the encryption
 /// step.
 pub(crate) fn deterministically_derive_seed_and_nonce(
-    payload: &UtxoNotificationPayload,
+    content: &NoteContent,
 ) -> ([u8; 32], BFieldElement) {
-    let combined = Tip5::hash_pair(payload.sender_randomness, payload.utxo.lock_script_hash());
-    let [e0, e1, e2, e3, e4] = combined.values();
-    let e0: [u8; 8] = e0.into();
-    let e1: [u8; 8] = e1.into();
-    let e2: [u8; 8] = e2.into();
-    let e3: [u8; 8] = e3.into();
-    let seed: [u8; 32] = [e0, e1, e2, e3].concat().try_into().unwrap();
+    match content {
+        NoteContent::Utxo(u) => {
+            let combined = Tip5::hash_pair(u.sender_randomness, Tip5::hash(&u.utxo));
+            let [e0, e1, e2, e3, e4] = combined.values();
+            let e0: [u8; 8] = e0.into();
+            let e1: [u8; 8] = e1.into();
+            let e2: [u8; 8] = e2.into();
+            let e3: [u8; 8] = e3.into();
+            let seed: [u8; 32] = [e0, e1, e2, e3].concat().try_into().unwrap();
 
-    (seed, e4)
+            (seed, e4)
+        }
+        NoteContent::Message(_) => todo!(),
+    }
 }
 
 // note: copied from twenty_first::math::lattice::kem::shake256()

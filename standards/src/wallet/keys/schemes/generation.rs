@@ -9,7 +9,6 @@ use nyks_consensus::BFieldElement;
 use nyks_consensus::network::Network;
 use nyks_consensus::tasm_lib::prelude::Digest;
 use nyks_consensus::tasm_lib::prelude::Tip5;
-use nyks_consensus::transaction::announcement::Announcement;
 use nyks_consensus::transaction::lock_script::LockScript;
 use nyks_consensus::transaction::lock_script::LockScriptAndWitness;
 use nyks_consensus::transaction::utxo::Utxo;
@@ -32,8 +31,9 @@ use crate::wallet::keys::key::Spender;
 use crate::wallet::keys::network_hrp_char;
 use crate::wallet::keys::shake256;
 use crate::wallet::keys::viewing_key::Decryptor;
-use crate::wallet::notes::encrypted_utxo_notification::EncryptedUtxoNotification;
-use crate::wallet::notes::utxo_notification::UtxoNotificationPayload;
+use crate::wallet::notes::content::NoteContent;
+use crate::wallet::notes::note::Note;
+use crate::wallet::notes::note::PrivateNote;
 
 pub(crate) const GENERATION_FLAG_U8: u8 = 79;
 pub const GENERATION_FLAG: BFieldElement = BFieldElement::new(GENERATION_FLAG_U8 as u64);
@@ -60,7 +60,7 @@ impl GenerationAddress {
     }
 
     // Used beneath private_note etc.
-    fn encrypt(&self, payload: &UtxoNotificationPayload) -> Vec<BFieldElement> {
+    fn encrypt(&self, payload: &NoteContent) -> Vec<BFieldElement> {
         let (randomness, nonce_bfe) = deterministically_derive_seed_and_nonce(payload);
         let (shared_key, kem_ctxt) = lattice::kem::enc(self.encryption_key, randomness);
 
@@ -121,31 +121,8 @@ impl Recipient for GenerationAddress {
         LockScript::standard_hash_lock_from_after_image(self.lock_postimage)
     }
 
-    fn create_note_announcement(
-        &self,
-        utxo_notification_payload: &UtxoNotificationPayload,
-    ) -> Announcement {
-        let encrypted_utxo_notification = EncryptedUtxoNotification {
-            flag: GENERATION_FLAG_U8.into(),
-            receiver_identifier: self.receiver_identifier(),
-            ciphertext: self.encrypt(utxo_notification_payload),
-        };
-
-        encrypted_utxo_notification.into_announcement()
-    }
-
-    fn create_note(
-        &self,
-        utxo_notification_payload: &UtxoNotificationPayload,
-        network: Network,
-    ) -> String {
-        let encrypted_utxo_notification = EncryptedUtxoNotification {
-            flag: GENERATION_FLAG_U8.into(),
-            receiver_identifier: self.receiver_identifier(),
-            ciphertext: self.encrypt(utxo_notification_payload),
-        };
-
-        encrypted_utxo_notification.into_bech32m(network)
+    fn create_private_note(&self, content: &NoteContent) -> Note {
+        PrivateNote::new(self.receiver_identifier(), self.encrypt(content)).into()
     }
 }
 

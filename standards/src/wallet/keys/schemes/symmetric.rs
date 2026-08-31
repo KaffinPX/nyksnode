@@ -10,7 +10,6 @@ use nyks_consensus::BFieldElement;
 use nyks_consensus::network::Network;
 use nyks_consensus::tasm_lib::prelude::Digest;
 use nyks_consensus::tasm_lib::prelude::Tip5;
-use nyks_consensus::transaction::announcement::Announcement;
 use nyks_consensus::transaction::lock_script::LockScript;
 use nyks_consensus::transaction::lock_script::LockScriptAndWitness;
 use nyks_consensus::transaction::utxo::Utxo;
@@ -29,8 +28,9 @@ use crate::wallet::keys::key::Spender;
 use crate::wallet::keys::network_hrp_char;
 use crate::wallet::keys::shake256;
 use crate::wallet::keys::viewing_key::Decryptor;
-use crate::wallet::notes::encrypted_utxo_notification::EncryptedUtxoNotification;
-use crate::wallet::notes::utxo_notification::UtxoNotificationPayload;
+use crate::wallet::notes::content::NoteContent;
+use crate::wallet::notes::note::Note;
+use crate::wallet::notes::note::PrivateNote;
 
 pub(crate) const SYMMETRIC_FLAG_U8: u8 = 80;
 pub const SYMMETRIC_FLAG: BFieldElement = BFieldElement::new(SYMMETRIC_FLAG_U8 as u64);
@@ -54,15 +54,15 @@ impl SymmetricAddress {
         hrp
     }
 
-    fn encrypt(&self, payload: &UtxoNotificationPayload) -> Vec<BFieldElement> {
+    fn encrypt(&self, content: &NoteContent) -> Vec<BFieldElement> {
         // 1. derive nonce deterministically
-        let (_randomness, nonce_bfe) = deterministically_derive_seed_and_nonce(payload);
+        let (_randomness, nonce_bfe) = deterministically_derive_seed_and_nonce(content);
 
         let nonce_bytes = [&nonce_bfe.value().to_be_bytes(), [0u8; 4].as_slice()].concat();
         let nonce = Nonce::from_slice(&nonce_bytes);
 
         // 2. serialize payload
-        let plaintext = bincode::serialize(payload).unwrap();
+        let plaintext = bincode::serialize(content).unwrap();
 
         // 3. encrypt
         let cipher = Aes256Gcm::new(&derive_encryption_secret(&self.receiver_postimage));
@@ -113,31 +113,8 @@ impl Recipient for SymmetricAddress {
         LockScript::standard_hash_lock_from_after_image(self.lock_postimage)
     }
 
-    fn create_note_announcement(
-        &self,
-        utxo_notification_payload: &UtxoNotificationPayload,
-    ) -> Announcement {
-        let encrypted_utxo_notification = EncryptedUtxoNotification {
-            flag: SYMMETRIC_FLAG_U8.into(),
-            receiver_identifier: self.receiver_identifier(),
-            ciphertext: self.encrypt(utxo_notification_payload),
-        };
-
-        encrypted_utxo_notification.into_announcement()
-    }
-
-    fn create_note(
-        &self,
-        utxo_notification_payload: &UtxoNotificationPayload,
-        network: Network,
-    ) -> String {
-        let encrypted_utxo_notification = EncryptedUtxoNotification {
-            flag: SYMMETRIC_FLAG_U8.into(),
-            receiver_identifier: self.receiver_identifier(),
-            ciphertext: self.encrypt(utxo_notification_payload),
-        };
-
-        encrypted_utxo_notification.into_bech32m(network)
+    fn create_private_note(&self, content: &NoteContent) -> Note {
+        PrivateNote::new(self.receiver_identifier(), self.encrypt(content)).into()
     }
 }
 
