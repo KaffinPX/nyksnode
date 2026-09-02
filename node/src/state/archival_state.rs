@@ -769,8 +769,7 @@ impl ArchivalState {
     /// `None` if no canonical block with this output is known.
     ///
     /// searches max `max_search_depth` from tip for a matching transaction
-    /// output. Unless the node maintain a UTXO index in which case all blocks
-    /// are searched and this parameter is ignored.
+    /// output.
     ///
     /// If `max_search_depth` is set to `None`, then all blocks are searched
     /// until a match is found. A `max_search_depth` of `Some(0)` will only

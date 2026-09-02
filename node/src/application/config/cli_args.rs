@@ -271,19 +271,6 @@ pub struct Args {
     #[clap(long, default_value = "1800", value_parser = duration_from_seconds_str)]
     pub reconnect_cooldown: Duration,
 
-    /// Construct and maintain a UTXO index
-    ///
-    /// If set, all announcements and inputs in all processed blocks will be
-    /// indexed in a database that enables a fast rescan for the discovery of
-    /// all balance-affecting inputs and outputs of blocks.
-    ///
-    /// If blocks have already been processed without this flag active, and the
-    /// flag is later activated, all blocks up to the current tip will be
-    /// indexed, when a new block is set as tip. This process might take some
-    /// time (tens of minutes).
-    #[clap(long)]
-    pub utxo_index: bool,
-
     /// Enable JSON/HTTP RPC.
     /// You can optionally specify an address and port (default: 127.0.0.1:9797).
     /// If not given, RPC is disabled.
