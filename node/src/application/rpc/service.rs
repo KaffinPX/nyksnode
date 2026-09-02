@@ -1,4 +1,3 @@
-
 use async_trait::async_trait;
 use itertools::Itertools;
 use nyks_consensus::block::Block;
