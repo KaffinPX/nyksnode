@@ -1,11 +1,8 @@
-use std::collections::HashSet;
 
 use async_trait::async_trait;
 use itertools::Itertools;
 use nyks_consensus::block::Block;
 use nyks_consensus::block::FUTUREDATING_LIMIT;
-use nyks_consensus::mutator_set::addition_record::AdditionRecord;
-use nyks_consensus::mutator_set::removal_record::absolute_index_set::AbsoluteIndexSet;
 use nyks_consensus::proof_abstractions::timestamp::Timestamp;
 use nyks_consensus::transaction::Transaction;
 use nyks_rpc_core::api::rpc::*;
@@ -648,112 +645,6 @@ impl RpcApi for RpcServer {
             .is_ok();
 
         Ok(SubmitBlockResponse { success })
-    }
-
-    /* Utxoindex */
-
-    async fn block_heights_by_flags_call(
-        &self,
-        request: BlockHeightsByFlagsRequest,
-    ) -> RpcResult<BlockHeightsByFlagsResponse> {
-        let announcement_flags: HashSet<_> = request.announcement_flags.into_iter().collect();
-        let heights = self
-            .state
-            .lock_guard()
-            .await
-            .chain
-            .archival_state()
-            .utxo_index
-            .as_ref()
-            .expect("Utxo index namespace can only be active when UTXO index is present")
-            .blocks_by_announcement_flags(&announcement_flags)
-            .await;
-
-        let block_heights = BlockHeightsByFlagsResponse {
-            block_heights: heights.into_iter().collect(),
-        };
-
-        Ok(block_heights)
-    }
-
-    async fn block_heights_by_addition_records_call(
-        &self,
-        request: BlockHeightsByAdditionRecordsRequest,
-    ) -> RpcResult<BlockHeightsByAdditionRecordsResponse> {
-        let addition_records: HashSet<AdditionRecord> = request
-            .addition_records
-            .into_iter()
-            .map(|x| x.into())
-            .collect();
-
-        let block_heights = self
-            .state
-            .lock_guard()
-            .await
-            .chain
-            .archival_state()
-            .addition_records_to_block_height(addition_records)
-            .await
-            .expect("Utxo index namespace can only be active when UTXO index is present");
-
-        let block_heights = BlockHeightsByAdditionRecordsResponse {
-            block_heights: block_heights.into_iter().collect(),
-        };
-
-        Ok(block_heights)
-    }
-
-    async fn block_heights_by_absolute_index_sets_call(
-        &self,
-        request: BlockHeightsByAbsoluteIndexSetsRequest,
-    ) -> RpcResult<BlockHeightsByAbsoluteIndexSetsResponse> {
-        let absolute_index_sets: HashSet<AbsoluteIndexSet> =
-            request.absolute_index_sets.into_iter().collect();
-
-        let block_heights = self
-            .state
-            .lock_guard()
-            .await
-            .chain
-            .archival_state()
-            .absolute_index_sets_to_block_heights(absolute_index_sets)
-            .await
-            .expect("Utxo index namespace can only be active when UTXO index is present");
-
-        let block_heights = BlockHeightsByAbsoluteIndexSetsResponse {
-            block_heights: block_heights.into_iter().collect(),
-        };
-
-        Ok(block_heights)
-    }
-
-    async fn was_mined_call(&self, request: WasMinedRequest) -> RpcResult<WasMinedResponse> {
-        if request.addition_records.is_empty() && request.absolute_index_sets.is_empty() {
-            return Err(RpcError::EmptyFilteringConditions);
-        }
-
-        let addition_records = request
-            .addition_records
-            .into_iter()
-            .map(|x| x.into())
-            .collect();
-        let absolute_index_sets = request.absolute_index_sets.into_iter().collect();
-
-        let blocks = self
-            .state
-            .lock_guard()
-            .await
-            .chain
-            .archival_state()
-            .canonical_block_heights_with_puts(absolute_index_sets, addition_records)
-            .await
-            .expect("UTXO index namespace is only active if UTXO index is maintained");
-
-        let res = WasMinedResponse {
-            block_heights: blocks.into_iter().collect(),
-        };
-
-        Ok(res)
     }
 
     /* Mempool */

@@ -43,9 +43,6 @@ pub enum Namespace {
 
     /// Endpoints for serving external wallets
     Wallet,
-
-    /// Endpoints relating to and requiring a UTXO index
-    Utxoindex,
 }
 
 #[derive(
@@ -140,18 +137,6 @@ pub enum RpcMethods {
 
     #[namespace(Namespace::Mining)]
     SubmitBlock,
-
-    #[namespace(Namespace::Utxoindex)]
-    BlockHeightsByFlags,
-
-    #[namespace(Namespace::Utxoindex)]
-    BlockHeightsByAdditionRecords,
-
-    #[namespace(Namespace::Utxoindex)]
-    BlockHeightsByAbsoluteIndexSets,
-
-    #[namespace(Namespace::Utxoindex)]
-    WasMined,
 
     #[namespace(Namespace::Mempool)]
     Transactions,

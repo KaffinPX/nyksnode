@@ -11,7 +11,6 @@ use serde::Serialize;
 use crate::state::archival_state::ARCHIVAL_BLOCK_MMR_DIRECTORY_NAME;
 use crate::state::archival_state::BLOCK_INDEX_DB_NAME;
 use crate::state::archival_state::MUTATOR_SET_DIRECTORY_NAME;
-use crate::state::archival_state::UTXO_INDEX_DIRECTORY_NAME;
 use crate::state::database::DATABASE_DIRECTORY_ROOT_NAME;
 use crate::state::networking_state::BANNED_IPS_DB_NAME;
 use crate::state::shared::BLOCK_FILENAME_EXTENSION;
@@ -126,16 +125,6 @@ impl DataDirectory {
     pub fn archival_block_mmr_dir_path(&self) -> PathBuf {
         self.database_dir_path()
             .join(Path::new(ARCHIVAL_BLOCK_MMR_DIRECTORY_NAME))
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
-    ///
-    /// The UTXO index database directory path
-    ///
-    /// This directory lives within `DataDirectory::database_dir_path()`.
-    pub(crate) fn utxo_index_dir_path(&self) -> PathBuf {
-        self.database_dir_path()
-            .join(Path::new(UTXO_INDEX_DIRECTORY_NAME))
     }
 
     ///////////////////////////////////////////////////////////////////////////

@@ -1,40 +1,21 @@
+pub(crate) mod import_blocks_from_files;
+
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::ops::DerefMut;
 use std::path::PathBuf;
 
 use anyhow::bail;
-use anyhow::ensure;
 use anyhow::Result;
 use itertools::Itertools;
 use memmap2::MmapOptions;
 use num_traits::Zero;
-use tasm_lib::prelude::Tip5;
 use tasm_lib::twenty_first::prelude::Mmr;
 use tasm_lib::twenty_first::tip5::digest::Digest;
 use tokio::io::AsyncSeekExt;
 use tokio::io::AsyncWriteExt;
 use tokio::io::SeekFrom;
 use tracing::debug;
-use tracing::info;
 use tracing::warn;
-
-pub(crate) mod import_blocks_from_files;
-pub mod rusty_utxo_index;
-
-use super::shared::new_block_file_is_needed;
-use super::StorageVecBase;
-use crate::application::config::cli_args::Args;
-use crate::application::config::data_directory::DataDirectory;
-use crate::state::archival_state::rusty_utxo_index::RustyUtxoIndex;
-use crate::state::database::BlockFileLocation;
-use crate::state::database::BlockIndexKey;
-use crate::state::database::BlockIndexValue;
-use crate::state::database::BlockRecord;
-use crate::state::database::FileRecord;
-use crate::state::database::LastFileRecord;
-use crate::util_types::rusty_archival_block_mmr::RustyArchivalBlockMmr;
-use crate::util_types::rusty_archival_mutator_set::RustyArchivalMutatorSet;
 use nyks_consensus::block::block_header::BlockHeader;
 use nyks_consensus::block::block_header::BlockHeaderWithBlockHashWitness;
 use nyks_consensus::block::block_header::HeaderToBlockHashWitness;
@@ -53,10 +34,22 @@ use nyks_database::storage::storage_schema::traits::*;
 use nyks_database::NeptuneLevelDb;
 use nyks_database::WriteBatchAsync;
 
+use super::shared::new_block_file_is_needed;
+use super::StorageVecBase;
+use crate::application::config::cli_args::Args;
+use crate::application::config::data_directory::DataDirectory;
+use crate::state::database::BlockFileLocation;
+use crate::state::database::BlockIndexKey;
+use crate::state::database::BlockIndexValue;
+use crate::state::database::BlockRecord;
+use crate::state::database::FileRecord;
+use crate::state::database::LastFileRecord;
+use crate::util_types::rusty_archival_block_mmr::RustyArchivalBlockMmr;
+use crate::util_types::rusty_archival_mutator_set::RustyArchivalMutatorSet;
+
 pub(crate) const BLOCK_INDEX_DB_NAME: &str = "block_index";
 pub(crate) const MUTATOR_SET_DIRECTORY_NAME: &str = "mutator_set";
 pub(crate) const ARCHIVAL_BLOCK_MMR_DIRECTORY_NAME: &str = "archival_block_mmr";
-pub(crate) const UTXO_INDEX_DIRECTORY_NAME: &str = "utxo_index";
 
 /// Provides interface to historic blockchain data which consists of
 ///  * block-data stored in individual files (append-only)
@@ -90,13 +83,6 @@ pub struct ArchivalState {
 
     /// Archival-MMR of the block digests belonging to the canonical chain.
     pub archival_block_mmr: RustyArchivalBlockMmr,
-
-    /// Mapping from block digest to a list of (flag, receiver_id) pairs for all
-    /// announcement in the block, and other indexing data related to historical
-    /// blocks. This index is only maintained if the node has been started with
-    /// the CLI flag `--utxo-index`, which implies that this value is Some(T).
-    /// If the node is not started with this flag, this value is `None`.
-    pub(crate) utxo_index: Option<RustyUtxoIndex>,
 
     /// The network that this node is on. Used to simplify method interfaces.
     network: Network,
@@ -312,22 +298,6 @@ impl ArchivalState {
             .expect("Must be able to initialize block index database");
         debug!("Got block index database");
 
-        // UTXO index is always initialized. But only populated with blocks if
-        // this index is activated.
-        let utxo_index = if cli.utxo_index {
-            let mut utxo_index = RustyUtxoIndex::initialize(&data_dir)
-                .await
-                .expect("Must be able to initialize utxo index database");
-
-            if utxo_index.is_empty().await {
-                utxo_index.index_block(&genesis_block).await;
-            }
-            debug!("UTXO index populated");
-            Some(utxo_index)
-        } else {
-            None
-        };
-
         let network = cli.network;
         let genesis_block = Box::new(genesis_block);
 
@@ -338,7 +308,6 @@ impl ArchivalState {
             archival_mutator_set,
             archival_block_mmr,
             network,
-            utxo_index,
         }
     }
 
@@ -559,7 +528,6 @@ impl ArchivalState {
         self.write_block_as_tip(block).await?;
         self.append_to_archival_block_mmr(block).await;
         self.update_mutator_set(block).await?;
-        self.update_utxo_index(block).await;
 
         Ok(())
     }
@@ -656,77 +624,6 @@ impl ArchivalState {
             .ammr_mut()
             .append(new_block.hash())
             .await;
-    }
-
-    /// Apply a new block to the UTXO index. Does nothing if no UTXO index is
-    /// maintained by this archival state.
-    ///
-    /// This method handles reorganizations, but all predecessors of this block
-    /// must be known and stored in the block index database for it to work.
-    /// Reorganizations leaves ophaned blocks in the index though. So this must
-    /// be accounted for when reading from the index.
-    ///
-    /// # Panics
-    /// - If any of the predecessor blocks have not been applied to the block
-    ///   index database.
-    async fn update_utxo_index(&mut self, new_block: &Block) {
-        if self.utxo_index.is_none() {
-            return;
-        }
-
-        let current_sync = self.utxo_index.as_ref().unwrap().sync_label().await;
-        let new_block_hash = new_block.hash();
-
-        // Index all not-yet-indexed blocks preceding the new block. In the
-        // common case, where the new block is the direct descendant of the
-        // block that was previously applied, only one block will be processed
-        // here. This path-finding logic allows for an efficient common-case
-        // processing, and an effcient "catchup" behavior where the UTXO index
-        // is many block behind the rest of the archival state.
-        let (_, _, missing_blocks) = self.find_path(current_sync, new_block_hash).await;
-
-        // Inform user if this will take a long time.
-        let num_missing_blocks = missing_blocks.len();
-        debug!("Applying {num_missing_blocks} missing blocks to UTXO index.");
-        if num_missing_blocks > 10 {
-            info!("Applying {num_missing_blocks} missing blocks to UTXO index. This may take a while.")
-        }
-        for missing in missing_blocks {
-            // This optimization means that we don't have to read the full
-            // blocks from disk in case it was already processed.
-            if self
-                .utxo_index
-                .as_ref()
-                .unwrap()
-                .block_was_indexed(missing)
-                .await
-            {
-                continue;
-            }
-
-            if missing == new_block_hash {
-                // Avoid reading the new block from disk if it's already in
-                // memory.
-                self.utxo_index
-                    .as_mut()
-                    .unwrap()
-                    .index_block(new_block)
-                    .await;
-            } else {
-                let missing = self
-                    .get_block(missing)
-                    .await
-                    .expect("Fetching block must succeed")
-                    .expect("missing block must exist before processed by UTXO index");
-                self.utxo_index
-                    .as_mut()
-                    .unwrap()
-                    .index_block(&missing)
-                    .await;
-            }
-        }
-
-        debug!("Done updating UTXO index");
     }
 
     async fn get_block_from_block_record(&self, block_record: BlockRecord) -> Result<Block> {
@@ -894,51 +791,23 @@ impl ArchivalState {
         )
     }
 
-    /// Returns the 1st block hash containing this addition record. Returns
-    /// `None` if no canonical block with this output is known.
-    ///
-    /// searches max `max_search_depth` from tip for a matching transaction
-    /// output. Unless the node maintain a UTXO index in which case all blocks
-    /// are searched and this parameter is ignored.
-    ///
-    /// If `max_search_depth` is set to `None`, then all blocks are searched
-    /// until a match is found. A `max_search_depth` of `Some(0)` will only
-    /// consider the tip.
-    ///
-    /// Never loads blocks from disk, so performance should be good.
     async fn find_canonical_block_hash_with_output(
         &self,
         output: AdditionRecord,
         max_search_depth: Option<u64>,
     ) -> Option<Digest> {
-        let block_heights = match &self.utxo_index {
-            Some(utxo_index) => {
-                let heights = utxo_index
-                    .blocks_by_addition_record(output)
-                    .await
-                    .into_iter()
-                    .map(|x| x.value())
-                    .sorted_unstable();
-                itertools::Either::Left(heights)
-            }
-            None => {
-                let tip_height = self.tip_header().await.height.value();
+        let tip_height = self.tip_header().await.height.value();
 
-                let end = match max_search_depth {
-                    Some(num) => tip_height.saturating_sub(num),
-                    None => 0,
-                };
-
-                let heights = (end..=tip_height).rev();
-                itertools::Either::Right(heights)
-            }
+        let end = match max_search_depth {
+            Some(num) => tip_height.saturating_sub(num),
+            None => 0,
         };
 
-        for block_height in block_heights {
+        for block_height in (end..=tip_height).rev() {
             let (addition_records, block_hash) = self
                 .addition_record_indices_for_block_by_height(block_height)
                 .await
-                .expect("Block height from UTXO index must be known");
+                .expect("Block height in search range must be known");
 
             if addition_records.contains_key(&output) {
                 return Some(block_hash);
@@ -951,41 +820,25 @@ impl ArchivalState {
     /// Returns the block containing this input. Returns `None` if no canonical
     /// block with this input is known.
     ///
-    /// searches max `max_search_depth` from tip for a matching transaction
-    /// input.
+    /// Searches max `max_search_depth` blocks back from tip for a matching
+    /// transaction input.
     ///
-    /// searches max `max_search_depth` from tip for a matching transaction
-    /// input. Unless the node maintain a UTXO index in which case all blocks
-    /// are searched and this parameter is ignored.
+    /// If `max_search_depth` is set to `None`, then all blocks are searched
+    /// until a match is found. A `max_search_depth` of `Some(0)` will only
+    /// consider the tip.
     pub(crate) async fn find_canonical_block_with_input(
         &self,
         input: AbsoluteIndexSet,
         max_search_depth: Option<u64>,
     ) -> Option<Block> {
-        let block_heights = match &self.utxo_index {
-            Some(utxo_index) => {
-                let heights = utxo_index
-                    .block_by_index_set(&input)
-                    .await
-                    .into_iter()
-                    .map(|x| x.value())
-                    .sorted_unstable();
-                itertools::Either::Left(heights)
-            }
-            None => {
-                let tip_height = self.tip_header().await.height.value();
+        let tip_height = self.tip_header().await.height.value();
 
-                let end = match max_search_depth {
-                    Some(num) => tip_height.saturating_sub(num),
-                    None => 0,
-                };
-
-                let heights = (end..=tip_height).rev();
-                itertools::Either::Right(heights)
-            }
+        let end = match max_search_depth {
+            Some(num) => tip_height.saturating_sub(num),
+            None => 0,
         };
 
-        for block_height in block_heights {
+        for block_height in (end..=tip_height).rev() {
             let block = self
                 .canonical_block_by_height(block_height.into())
                 .await
@@ -1002,180 +855,6 @@ impl ArchivalState {
         }
 
         None
-    }
-
-    /// Return all block heights of blocks belonging to the canonical chain
-    /// containing any of the requested addition records.
-    ///
-    /// Never loads the entire block from disk. Only reads from the database, so
-    /// performace should be good.
-    ///
-    /// Only works if a UTXO index is maintained.
-    pub(crate) async fn addition_records_to_block_height(
-        &self,
-        addition_records: HashSet<AdditionRecord>,
-    ) -> Result<HashSet<BlockHeight>> {
-        ensure!(
-            self.utxo_index.is_some(),
-            "Only works a UTXO index is maintained."
-        );
-
-        let mut ret = HashSet::new();
-        for addition_record in addition_records {
-            let maybe_matching_blocks = self
-                .utxo_index
-                .as_ref()
-                .unwrap()
-                .blocks_by_addition_record(addition_record)
-                .await;
-
-            // Verify reported block height matches a block in the canonical
-            // chain.
-            // An addition record can (theoretically) be present in mutiple
-            // blocks, and even multiple times in the same block. This loop
-            // handles that case. Common case is that returned list has length
-            // zero or one.
-            for height in maybe_matching_blocks {
-                let (actual_ars_in_canonical_block, _) = self
-                    .addition_record_indices_for_block_by_height(height.into())
-                    .await
-                    .expect("Height reported by UTXO index must be known by archival state");
-                if actual_ars_in_canonical_block.contains_key(&addition_record) {
-                    ret.insert(height);
-                }
-            }
-        }
-
-        Ok(ret)
-    }
-
-    /// Return all block heights of blocks belonging to the canonical chain
-    /// containing any of the requested absolute index sets.
-    ///
-    /// Never loads the entire block from disk. Only reads from the database, so
-    /// performace should be good.
-    ///
-    /// Only works if a UTXO index is maintained.
-    pub(crate) async fn absolute_index_sets_to_block_heights(
-        &self,
-        absolute_index_sets: HashSet<AbsoluteIndexSet>,
-    ) -> Result<HashSet<BlockHeight>> {
-        ensure!(
-            self.utxo_index.is_some(),
-            "Only works a UTXO index is maintained."
-        );
-
-        let mut ret = HashSet::new();
-        for index_set in absolute_index_sets {
-            let maybe_matching_block = self
-                .utxo_index
-                .as_ref()
-                .unwrap()
-                .block_by_index_set(&index_set)
-                .await;
-
-            let Some(maybe_matching_block) = maybe_matching_block else {
-                continue;
-            };
-
-            // No use to add same block height twice.
-            if ret.contains(&maybe_matching_block) {
-                continue;
-            }
-
-            // Verify that the block height in question has not been reorganized
-            // out of canonicity.
-            let Some(block_hash) = self
-                .archival_block_mmr
-                .ammr()
-                .try_get_leaf(maybe_matching_block.into())
-                .await
-            else {
-                // Reorganization to shorter chain. Very unlikely.
-                continue;
-            };
-
-            let block_index_set_digests = self
-                .utxo_index
-                .as_ref()
-                .unwrap()
-                .index_set_digests(block_hash)
-                .await
-                .expect("Canonical block must have been indexed by UTXO index");
-
-            let index_set_digest = Tip5::hash(&index_set);
-            if block_index_set_digests.contains(&index_set_digest) {
-                ret.insert(maybe_matching_block);
-            }
-        }
-
-        Ok(ret)
-    }
-
-    /// Return the block heights for blocks matching *all* elements in the
-    /// specified input/output lists, for blocks belonging to the canonical
-    /// chain. Will not return block heights were e.g. only one of the outputs
-    /// was included if more than one output is included in the outputs list.
-    ///
-    /// Can return multiple blocks in the case where blocks are selected only
-    /// based on addition records and multiple blocks contain the same addition
-    /// records.
-    ///
-    /// Only works if a UTXO index is maintained, otherwise an error is
-    /// returned.
-    ///
-    /// # Panics
-    /// - If no filtering is applied, i.e. if both input and output lists are
-    ///   empty.
-    pub(crate) async fn canonical_block_heights_with_puts(
-        &self,
-        absolute_index_sets: HashSet<AbsoluteIndexSet>,
-        addition_records: HashSet<AdditionRecord>,
-    ) -> Result<HashSet<BlockHeight>> {
-        ensure!(
-            self.utxo_index.is_some(),
-            "Only works a UTXO index is maintained."
-        );
-
-        assert!(
-            !addition_records.is_empty() || !absolute_index_sets.is_empty(),
-            "No filtering was applied"
-        );
-
-        let mut block_matches: Option<HashSet<BlockHeight>> = None;
-        for index_set in absolute_index_sets {
-            let block_heights = self
-                .absolute_index_sets_to_block_heights(HashSet::from([index_set]))
-                .await
-                .expect("Utxo index namespace can only be active when UTXO index is present");
-
-            match block_matches {
-                Some(bmatches) => {
-                    block_matches = Some(bmatches.intersection(&block_heights).copied().collect());
-                }
-                None => {
-                    block_matches = Some(block_heights);
-                }
-            }
-        }
-
-        for addition_record in addition_records {
-            let block_heights = self
-                .addition_records_to_block_height(HashSet::from([addition_record]))
-                .await
-                .expect("Utxo index namespace can only be active when UTXO index is present");
-
-            match block_matches {
-                Some(bmatches) => {
-                    block_matches = Some(bmatches.intersection(&block_heights).copied().collect());
-                }
-                None => {
-                    block_matches = Some(block_heights);
-                }
-            }
-        }
-
-        Ok(block_matches.expect("At least one filtering criteria was set"))
     }
 
     /// Return latest block from database, or genesis block if no other block
@@ -1342,7 +1021,7 @@ impl ArchivalState {
         )
     }
 
-    /// Returns a [`HashMap`] of [`AdditionRecord`] to  AOCL leaf indices for
+    /// Returns a [`HashMap`] of [`AdditionRecord`] to AOCL leaf indices for
     /// all outputs in a given block, including guesser rewards.  Also returns
     /// the block hash. Returns `None` if no block at the specified height is
     /// known. AOCL leaf indices have list type since a block can contain the

@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use nyks_standards::wallet::notes::announcement_flag::AnnouncementFlag;
 use serde::Deserialize;
 use serde::Serialize;
 use tasm_lib::prelude::Digest;
@@ -364,83 +363,6 @@ pub trait RpcApi: Sync + Send {
         &self,
         request: SubmitBlockRequest,
     ) -> RpcResult<SubmitBlockResponse>;
-
-    /* Utxoindex */
-
-    /// Return block heights for blocks containing announcements with specified
-    /// announcement flags. May return results from orphaned blocks.
-    async fn block_heights_by_flags(
-        &self,
-        announcement_flags: Vec<AnnouncementFlag>,
-    ) -> RpcResult<BlockHeightsByFlagsResponse> {
-        self.block_heights_by_flags_call(BlockHeightsByFlagsRequest { announcement_flags })
-            .await
-    }
-
-    async fn block_heights_by_flags_call(
-        &self,
-        request: BlockHeightsByFlagsRequest,
-    ) -> RpcResult<BlockHeightsByFlagsResponse>;
-
-    /// Return block heights for blocks containing specified addition records.
-    /// Returned block heights are guaranteed to reference blocks belonging to
-    /// the canonical chain.
-    async fn block_heights_by_addition_records(
-        &self,
-        addition_records: Vec<RpcAdditionRecord>,
-    ) -> RpcResult<BlockHeightsByAdditionRecordsResponse> {
-        self.block_heights_by_addition_records_call(BlockHeightsByAdditionRecordsRequest {
-            addition_records,
-        })
-        .await
-    }
-
-    async fn block_heights_by_addition_records_call(
-        &self,
-        request: BlockHeightsByAdditionRecordsRequest,
-    ) -> RpcResult<BlockHeightsByAdditionRecordsResponse>;
-
-    async fn block_heights_by_absolute_index_sets(
-        &self,
-        absolute_index_sets: Vec<RpcAbsoluteIndexSet>,
-    ) -> RpcResult<BlockHeightsByAbsoluteIndexSetsResponse> {
-        self.block_heights_by_absolute_index_sets_call(BlockHeightsByAbsoluteIndexSetsRequest {
-            absolute_index_sets,
-        })
-        .await
-    }
-
-    /// Return block heights for blocks containing specified absolute index
-    /// sets. Returned block heights are guaranteed to reference blocks
-    /// belonging to the canonical chain.
-    async fn block_heights_by_absolute_index_sets_call(
-        &self,
-        request: BlockHeightsByAbsoluteIndexSetsRequest,
-    ) -> RpcResult<BlockHeightsByAbsoluteIndexSetsResponse>;
-
-    /// Return the block heights for blocks matching *all* elements in the
-    /// specified input/output lists, for blocks belonging to the canonical
-    /// chain. Will not return block heights were e.g. only one of the outputs
-    /// was included if more than one output is included in the outputs list.
-    ///
-    /// Can return multiple blocks in the case where blocks are selected only
-    /// based on addition records and multiple blocks contain the same addition
-    /// records.
-    ///
-    /// Returns an error if no filtering conditions are set.
-    async fn was_mined(
-        &self,
-        inputs: Vec<RpcAbsoluteIndexSet>,
-        outputs: Vec<RpcAdditionRecord>,
-    ) -> RpcResult<WasMinedResponse> {
-        self.was_mined_call(WasMinedRequest {
-            absolute_index_sets: inputs,
-            addition_records: outputs,
-        })
-        .await
-    }
-
-    async fn was_mined_call(&self, request: WasMinedRequest) -> RpcResult<WasMinedResponse>;
 
     /* Mempool */
 

@@ -12,7 +12,6 @@ use crate::model::block::*;
 use crate::model::common::*;
 use crate::model::mining::mempool::RpcMempoolMetadata;
 use crate::model::mining::template::RpcBlockTemplate;
-use crate::model::wallet::RpcAnnouncementFlag;
 use crate::model::wallet::block::*;
 use crate::model::wallet::mutator_set::*;
 use crate::model::wallet::transaction::RpcTransaction;
@@ -353,57 +352,6 @@ pub struct SubmitBlockRequest {
 #[serde(rename_all = "camelCase")]
 pub struct SubmitBlockResponse {
     pub success: bool,
-}
-
-/* Utxo Index */
-
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-#[serde(rename_all = "camelCase")]
-pub struct BlockHeightsByFlagsRequest {
-    pub announcement_flags: Vec<RpcAnnouncementFlag>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BlockHeightsByFlagsResponse {
-    pub block_heights: Vec<RpcBlockHeight>,
-}
-
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-#[serde(rename_all = "camelCase")]
-pub struct BlockHeightsByAdditionRecordsRequest {
-    pub addition_records: Vec<RpcAdditionRecord>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BlockHeightsByAdditionRecordsResponse {
-    pub block_heights: Vec<RpcBlockHeight>,
-}
-
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-#[serde(rename_all = "camelCase")]
-pub struct BlockHeightsByAbsoluteIndexSetsRequest {
-    pub absolute_index_sets: Vec<RpcAbsoluteIndexSet>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BlockHeightsByAbsoluteIndexSetsResponse {
-    pub block_heights: Vec<RpcBlockHeight>,
-}
-
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-#[serde(rename_all = "camelCase")]
-pub struct WasMinedRequest {
-    pub absolute_index_sets: Vec<RpcAbsoluteIndexSet>,
-    pub addition_records: Vec<RpcAdditionRecord>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WasMinedResponse {
-    pub block_heights: Vec<RpcBlockHeight>,
 }
 
 /* Mempool */
