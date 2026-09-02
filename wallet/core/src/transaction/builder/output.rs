@@ -3,21 +3,18 @@
 use std::ops::Deref;
 use std::ops::DerefMut;
 
-use nyks_consensus::tasm_lib::prelude::Digest;
-use nyks_standards::wallet::keys::address::Address;
-use nyks_standards::wallet::keys::address::Recipient;
-use nyks_standards::wallet::notes::utxo_notification::PrivateNotificationData;
-use nyks_standards::wallet::notes::utxo_notification::UtxoNotificationPayload;
-use serde::Deserialize;
-use serde::Serialize;
-
 use nyks_consensus::mutator_set::addition_record::AdditionRecord;
-use nyks_consensus::network::Network;
 use nyks_consensus::proof_abstractions::timestamp::Timestamp;
+use nyks_consensus::tasm_lib::prelude::Digest;
 use nyks_consensus::transaction::announcement::Announcement;
 use nyks_consensus::transaction::utxo::Utxo;
 use nyks_consensus::transaction::utxo_triple::UtxoTriple;
 use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
+use nyks_standards::wallet::keys::address::Address;
+use nyks_standards::wallet::keys::address::Recipient;
+use nyks_standards::wallet::notes::content::UtxoContent;
+use serde::Deserialize;
+use serde::Serialize;
 
 use crate::transaction::utxo::notifications::UtxoNotificationMedium;
 use crate::transaction::utxo::notifications::UtxoNotificationMethod;
@@ -56,8 +53,8 @@ impl TxOutput {
         }
     }
 
-    fn notification_payload(&self) -> UtxoNotificationPayload {
-        UtxoNotificationPayload::new(self.utxo(), self.sender_randomness())
+    fn note_content(&self) -> UtxoContent {
+        UtxoContent::new(self.utxo(), self.sender_randomness())
     }
 
     /// retrieve native currency amount
@@ -197,29 +194,19 @@ impl TxOutput {
     }
 
     /// Retrieve on-chain UTXO notification announcement, if any.
+    /// TODO: redesign this potentially
     pub fn announcement(&self) -> Option<Announcement> {
         match &self.notification_method {
             UtxoNotificationMethod::None => None,
             UtxoNotificationMethod::OffChain(_) => None,
             UtxoNotificationMethod::OnChain(receiving_address) => {
-                let notification_payload = self.notification_payload();
-                Some(receiving_address.create_note_announcement(&notification_payload))
+                let utxo_content = self.note_content();
+                Some(
+                    receiving_address
+                        .create_private_note(&utxo_content.into())
+                        .into_announcement(),
+                )
             }
-        }
-    }
-
-    pub(crate) fn offchain_notification(&self, network: Network) -> Option<(String, Address)> {
-        match &self.notification_method {
-            UtxoNotificationMethod::OnChain(_) => None,
-            UtxoNotificationMethod::OffChain(recipient) => {
-                let notification_payload = self.notification_payload();
-
-                Some((
-                    recipient.create_note(&notification_payload, network),
-                    recipient.to_owned(),
-                ))
-            }
-            UtxoNotificationMethod::None => None,
         }
     }
 
@@ -341,23 +328,6 @@ impl TxOutputList {
         }
 
         announcements
-    }
-
-    pub fn offchain_notifications(
-        &self,
-        network: Network,
-    ) -> impl Iterator<Item = PrivateNotificationData> + use<'_> {
-        self.0.iter().filter_map(move |tx_output| {
-            if let Some((ciphertext, receiver_address)) = tx_output.offchain_notification(network) {
-                Some(PrivateNotificationData {
-                    cleartext: tx_output.notification_payload(),
-                    ciphertext,
-                    recipient_address: receiver_address,
-                })
-            } else {
-                None
-            }
-        })
     }
 
     /// indicates if any offchain notifications exist

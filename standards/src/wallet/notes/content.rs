@@ -20,6 +20,12 @@ pub trait Content:
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, BFieldCodec)]
 pub struct MessageContent(pub Vec<BFieldElement>);
 
+impl MessageContent {
+    pub fn new(content: Vec<BFieldElement>) -> Self {
+        Self(content)
+    }
+}
+
 impl Content for MessageContent {
     const DISCRIMINANT: u64 = 0;
 }
@@ -29,6 +35,15 @@ impl Content for MessageContent {
 pub struct UtxoContent {
     pub utxo: Utxo,
     pub sender_randomness: Digest,
+}
+
+impl UtxoContent {
+    pub fn new(utxo: Utxo, sender_randomness: Digest) -> Self {
+        Self {
+            utxo,
+            sender_randomness,
+        }
+    }
 }
 
 impl Content for UtxoContent {
