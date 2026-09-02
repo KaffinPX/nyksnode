@@ -1,6 +1,6 @@
 .PHONY: clean help stats bench all install run test build doc check format bench-no-run pretty-log ensure-clang
 
-prog :=neptune-core
+prog :=nyks-node
 
 # Passive dependency-checker. Informs and exits.
 check-clang:
@@ -41,7 +41,7 @@ build: ensure-clang
 
 doc:
 	cargo doc --no-deps
-	xdg-open "target/doc/neptune-core/index.html"
+	xdg-open "target/doc/nyks_node/index.html"
 
 check: check-clang
 	cargo check
@@ -59,12 +59,11 @@ happy: clippy format
 	cargo test --doc
 
 install: ensure-clang
-	cargo install --force --locked --path neptune-core/
-	cargo install --force --locked --path neptune-core-cli/
-	cargo install --force --locked --path neptune-dashboard/
-
-install-linux: install
-	@echo "\n\nPlease run:\n./scripts/linux/install-bash-completions.sh\nto install bash-completions for Neptune-core's CLI."
+	cargo install --force --locked --path nyks-node/
+	cargo install --force --locked --path nyks-prover/
+	cargo install --force --locked --path nyks-wallet/
+	cargo install --force --locked --path nyks-composer/
+	cargo install --force --locked --path nyks-upgrader/
 
 clippy:
 	cargo clippy --all-targets -- -D warnings
