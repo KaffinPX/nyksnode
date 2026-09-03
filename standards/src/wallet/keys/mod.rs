@@ -43,7 +43,6 @@ pub(crate) fn deterministically_derive_seed_and_nonce(
 
             (seed, e4)
         }
-        NoteContent::Message(_) => todo!(),
     }
 }
 
