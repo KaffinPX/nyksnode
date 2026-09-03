@@ -29,7 +29,7 @@ impl PublicNote {
         }
     }
 
-    pub fn into_message(&self) -> Vec<BFieldElement> {
+    pub fn into_message(self) -> Vec<BFieldElement> {
         let mut msg = vec![
             BFieldElement::new(TAG_PUBLIC),
             self.receiver_id,
@@ -70,9 +70,9 @@ impl PrivateNote {
         }
     }
 
-    pub fn into_message(&self) -> Vec<BFieldElement> {
+    pub fn into_message(self) -> Vec<BFieldElement> {
         let mut msg = vec![BFieldElement::new(TAG_PRIVATE), self.receiver_id];
-        msg.extend(self.ciphertext.clone());
+        msg.extend(self.ciphertext);
         msg
     }
 
