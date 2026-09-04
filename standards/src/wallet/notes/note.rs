@@ -135,7 +135,7 @@ impl Note {
     }
 
     pub fn into_bech32m(self, network: Network) -> String {
-        let hrp = Self::get_hrp(network);
+        let hrp = Self::hrp(network);
         let msg = self.into_announcement().message;
         let payload =
             bincode::serialize(&msg).expect("BFieldElement vec serialization never fails");
@@ -150,7 +150,7 @@ impl Note {
             variant == bech32::Variant::Bech32m,
             "Only bech32m is supported"
         );
-        ensure!(hrp == Self::get_hrp(network), "Invalid HRP for network");
+        ensure!(hrp == Self::hrp(network), "Invalid HRP for network");
         let payload = Vec::<u8>::from_base32(&data)?;
         let msg: Vec<BFieldElement> = bincode::deserialize(&payload)
             .map_err(|e| anyhow::anyhow!("Failed to deserialize bech32 payload: {e}"))?;
@@ -158,7 +158,7 @@ impl Note {
         Self::try_from_announcement(&ann)
     }
 
-    fn get_hrp(network: Network) -> String {
+    fn hrp(network: Network) -> String {
         format!("note{}", network_hrp_char(network))
     }
 }
