@@ -1,19 +1,30 @@
 use std::fmt::Debug;
 
-use anyhow::Result;
-use anyhow::bail;
 use nyks_consensus::BFieldElement;
 use nyks_consensus::transaction::utxo::Utxo;
 use nyks_consensus::twenty_first::math::bfield_codec::BFieldCodec;
 use nyks_consensus::twenty_first::tip5::Digest;
 use serde::Deserialize;
 use serde::Serialize;
+use thiserror::Error;
 
 pub trait Content:
     Clone + Debug + PartialEq + Eq + Send + Sync + BFieldCodec + for<'de> Deserialize<'de> + Serialize
 {
     /// Unique discriminant used in the note header.
     const DISCRIMINANT: u64;
+}
+
+/// Errors that can occur when working with [`NoteContent`].
+#[derive(Debug, Error)]
+pub enum NoteContentError {
+    #[error("unknown content discriminant: {0}")]
+    UnknownDiscriminant(u64),
+
+    // Boxed because each Content impl has its own BFieldCodec::Error type.
+    // One Decode variant can then handle all of them.
+    #[error("failed to decode content: {0}")]
+    Decode(Box<dyn std::error::Error + Send + Sync>),
 }
 
 /// UTXO notification payload.
@@ -57,10 +68,14 @@ impl NoteContent {
     }
 
     /// Decodes content from a discriminant and a data slice.
-    pub fn decode(disc: u64, data: &[BFieldElement]) -> Result<Self> {
+    pub fn decode(disc: u64, data: &[BFieldElement]) -> Result<Self, NoteContentError> {
         match disc {
-            d if d == UtxoContent::DISCRIMINANT => Ok(Self::Utxo(*UtxoContent::decode(data)?)),
-            _ => bail!("Unknown content discriminant: {disc}"),
+            d if d == UtxoContent::DISCRIMINANT => {
+                let content =
+                    UtxoContent::decode(data).map_err(|e| NoteContentError::Decode(e.into()))?;
+                Ok(Self::Utxo(*content))
+            }
+            _ => Err(NoteContentError::UnknownDiscriminant(disc)),
         }
     }
 }
