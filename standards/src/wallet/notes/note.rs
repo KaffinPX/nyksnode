@@ -6,6 +6,7 @@ use bech32::ToBase32;
 use nyks_consensus::BFieldElement;
 use nyks_consensus::network::Network;
 use nyks_consensus::transaction::announcement::Announcement;
+use nyks_consensus::twenty_first::math::bfield_codec::BFieldCodec;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -40,15 +41,14 @@ impl PublicNote {
     }
 
     pub fn from_message(data: &[BFieldElement]) -> Result<Self> {
-        if data.len() < 3 {
+        if data.len() < 2 {
             bail!("Public note too short");
         }
         if data[0].value() != TAG_PUBLIC {
             bail!("Expected public tag, got {}", data[0].value());
         }
         let receiver_id = data[1];
-        let disc = data[2].value();
-        let content = NoteContent::decode(disc, &data[3..])?;
+        let content = *NoteContent::decode(&data[2..])?;
         Ok(Self {
             receiver_id,
             content,
