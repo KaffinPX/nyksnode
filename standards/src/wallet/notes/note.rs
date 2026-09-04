@@ -31,11 +31,7 @@ impl PublicNote {
     }
 
     pub fn into_message(self) -> Vec<BFieldElement> {
-        let mut msg = vec![
-            BFieldElement::new(TAG_PUBLIC),
-            self.receiver_id,
-            BFieldElement::new(self.content.discriminant()),
-        ];
+        let mut msg = vec![BFieldElement::new(TAG_PUBLIC), self.receiver_id];
         msg.extend(self.content.encode());
         msg
     }
