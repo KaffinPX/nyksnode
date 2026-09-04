@@ -12,7 +12,6 @@ use nyks_consensus::tasm_lib::prelude::Digest;
 use nyks_consensus::tasm_lib::prelude::Tip5;
 use nyks_consensus::transaction::lock_script::LockScript;
 use nyks_consensus::transaction::lock_script::LockScriptAndWitness;
-use nyks_consensus::transaction::utxo::Utxo;
 use serde::Deserialize;
 use serde::Serialize;
 use thiserror::Error;
@@ -172,9 +171,6 @@ pub enum SymmetricDecryptError {
 
     #[error("Decryption failed")]
     Decryption(#[from] aes_gcm::Error),
-
-    #[error("Deserialization failed")]
-    Deserialization(#[from] bincode::Error),
 }
 
 impl Zeroize for SymmetricKey {
@@ -222,7 +218,7 @@ impl Decryptor for SymmetricViewingKey {
         self.privacy_preimage
     }
 
-    fn decrypt(&self, ciphertext: &[BFieldElement]) -> Result<(Utxo, Digest), Self::Error> {
+    fn decrypt(&self, ciphertext: &[BFieldElement]) -> Result<Vec<u8>, Self::Error> {
         const NONCE_LEN: usize = 1;
 
         if ciphertext.len() <= NONCE_LEN {
@@ -240,7 +236,7 @@ impl Decryptor for SymmetricViewingKey {
         let cipher = Aes256Gcm::new(&self.key);
         let plaintext = cipher.decrypt(nonce, ciphertext_bytes.as_ref())?;
 
-        Ok(bincode::deserialize(&plaintext)?)
+        Ok(plaintext)
     }
 }
 

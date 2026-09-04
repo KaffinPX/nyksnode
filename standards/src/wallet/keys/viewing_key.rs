@@ -1,5 +1,4 @@
 use nyks_consensus::BFieldElement;
-use nyks_consensus::transaction::utxo::Utxo;
 use nyks_consensus::twenty_first::tip5::Digest;
 use zeroize::Zeroize;
 use zeroize::ZeroizeOnDrop;
@@ -19,7 +18,7 @@ pub trait Decryptor {
     // Needed to extract indices of an UTXO and see if it is/was part of mutator set.
     fn privacy_preimage(&self) -> Digest;
 
-    fn decrypt(&self, ciphertext: &[BFieldElement]) -> Result<(Utxo, Digest), Self::Error>;
+    fn decrypt(&self, ciphertext: &[BFieldElement]) -> Result<Vec<u8>, Self::Error>;
 }
 
 #[derive(Debug)]
@@ -52,7 +51,7 @@ impl Decryptor for ViewingKey {
         }
     }
 
-    fn decrypt(&self, ciphertext: &[BFieldElement]) -> Result<(Utxo, Digest), Self::Error> {
+    fn decrypt(&self, ciphertext: &[BFieldElement]) -> Result<Vec<u8>, Self::Error> {
         match self {
             ViewingKey::Generation(k) => k.decrypt(ciphertext).map_err(ViewingKeyError::Generation),
             ViewingKey::Symmetric(k) => k.decrypt(ciphertext).map_err(ViewingKeyError::Symmetric),

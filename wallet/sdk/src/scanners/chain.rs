@@ -269,8 +269,15 @@ impl ChainScanner {
                     })
                     .filter_map(|a| extract_ciphertext(a))
                     .filter_map(|ciphertext| key.decrypt(&ciphertext).ok())
-                    .map(|(utxo, sender_randomness)| {
+                    .map(|decrypted: Vec<u8>| {
+                        let (utxo, sender_randomness): (Utxo, Digest) =
+                            bincode::deserialize(&decrypted).unwrap();
                         (utxo, sender_randomness, key.privacy_preimage())
+                    })
+                    // A third party can create an announcement that decrypts under this key but
+                    // contains a UTXO that is unspendable by us.
+                    .filter(|(utxo, _, _)| {
+                        utxo.lock_script_hash() == key.address().lock_script().hash()
                     })
                     .collect::<Vec<_>>()
             })

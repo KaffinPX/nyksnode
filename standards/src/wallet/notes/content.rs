@@ -83,8 +83,8 @@ impl BFieldCodec for NoteContent {
 
         match discriminant {
             d if d == UtxoContent::DISCRIMINANT => {
-                let content = UtxoContent::decode(rest)
-                    .map_err(|e| NoteContentError::Decode(e.into()))?;
+                let content =
+                    UtxoContent::decode(rest).map_err(|e| NoteContentError::Decode(e.into()))?;
                 Ok(Box::new(Self::Utxo(*content)))
             }
             _ => Err(NoteContentError::UnknownDiscriminant(discriminant)),

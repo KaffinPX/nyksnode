@@ -11,7 +11,6 @@ use nyks_consensus::tasm_lib::prelude::Digest;
 use nyks_consensus::tasm_lib::prelude::Tip5;
 use nyks_consensus::transaction::lock_script::LockScript;
 use nyks_consensus::transaction::lock_script::LockScriptAndWitness;
-use nyks_consensus::transaction::utxo::Utxo;
 use nyks_consensus::twenty_first::math::lattice;
 use nyks_consensus::twenty_first::math::lattice::kem::CIPHERTEXT_SIZE_IN_BFES;
 use nyks_consensus::twenty_first::math::lattice::kem::PublicKey;
@@ -188,9 +187,6 @@ pub enum GenerationDecryptError {
 
     #[error("Failed to convert BFieldElements to bytes")]
     BfeToBytes,
-
-    #[error("Deserialization failed")]
-    Deserialization(#[from] bincode::Error),
 }
 
 impl Zeroize for GenerationKey {
@@ -238,7 +234,7 @@ impl Decryptor for GenerationViewingKey {
         self.privacy_preimage
     }
 
-    fn decrypt(&self, ciphertext: &[BFieldElement]) -> Result<(Utxo, Digest), Self::Error> {
+    fn decrypt(&self, ciphertext: &[BFieldElement]) -> Result<Vec<u8>, Self::Error> {
         // parse ciphertext
         if ciphertext.len() <= CIPHERTEXT_SIZE_IN_BFES {
             return Err(GenerationDecryptError::MissingNonce);
@@ -273,10 +269,7 @@ impl Decryptor for GenerationViewingKey {
             .decrypt(nonce, ciphertext_bytes.as_ref())
             .map_err(|_| GenerationDecryptError::SymmetricDecryptionFailed)?;
 
-        // convert plaintext to utxo and digest
-        let result = bincode::deserialize(&plaintext)?; // uses #[from]
-
-        Ok(result)
+        Ok(plaintext)
     }
 }
 
