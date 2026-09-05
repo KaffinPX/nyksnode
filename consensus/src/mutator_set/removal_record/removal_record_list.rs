@@ -564,10 +564,10 @@ impl RemovalRecordList {
             {
                 if *tree_height < Self::ENCODING_TREE_HEIGHT_OFFSET {
                     // Verify that tree heights are sorted correctly
-                    if let Some(previous) = tree_heights.last() {
-                        if *previous > *tree_height {
-                            return Err(RemovalRecordListUnpackError::IncorrectlySortedTreeHeights);
-                        }
+                    if let Some(previous) = tree_heights.last()
+                        && *previous > *tree_height
+                    {
+                        return Err(RemovalRecordListUnpackError::IncorrectlySortedTreeHeights);
                     }
 
                     // use both authentication structure and chunk

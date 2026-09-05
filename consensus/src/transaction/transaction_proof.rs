@@ -68,6 +68,7 @@ impl TransactionProofType {
 
 /// represents a transaction proof, which can be of different types.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, GetSize, BFieldCodec)]
+#[allow(clippy::large_enum_variant)]
 pub enum TransactionProof {
     /// a strong proof.  required for confirming a transaction into a block.
     SingleProof(NyksProof),

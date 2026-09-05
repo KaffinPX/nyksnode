@@ -100,7 +100,6 @@ impl TransactionProver {
             rng.random(),
             consensus_rule_set,
         )
-        .await
         .unwrap()
         .into();
 
