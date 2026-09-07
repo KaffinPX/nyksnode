@@ -110,29 +110,9 @@ impl Note {
         matches!(self, Self::Private(_))
     }
 
-    pub fn into_announcement(self) -> Announcement {
-        let msg = match self {
-            Self::Public(p) => p.into_message(),
-            Self::Private(p) => p.into_message(),
-        };
-        Announcement::new(msg)
-    }
-
-    pub fn try_from_announcement(ann: &Announcement) -> Result<Self> {
-        let msg = &ann.message;
-        if msg.is_empty() {
-            bail!("Empty announcement");
-        }
-        match msg[0].value() {
-            TAG_PUBLIC => Ok(Self::Public(PublicNote::from_message(msg)?)),
-            TAG_PRIVATE => Ok(Self::Private(PrivateNote::from_message(msg)?)),
-            other => bail!("Unknown tag: {other}"),
-        }
-    }
-
     pub fn into_bech32m(self, network: Network) -> String {
         let hrp = Self::hrp(network);
-        let msg = self.into_announcement().message;
+        let msg = Announcement::from(self).message;
         let payload =
             bincode::serialize(&msg).expect("BFieldElement vec serialization never fails");
         let payload_base32 = payload.to_base32();
@@ -150,12 +130,38 @@ impl Note {
         let payload = Vec::<u8>::from_base32(&data)?;
         let msg: Vec<BFieldElement> = bincode::deserialize(&payload)
             .map_err(|e| anyhow::anyhow!("Failed to deserialize bech32 payload: {e}"))?;
-        let ann = Announcement::new(msg);
-        Self::try_from_announcement(&ann)
+        let announcement = Announcement::new(msg);
+        Self::try_from(&announcement)
     }
 
     fn hrp(network: Network) -> String {
         format!("note{}", network_hrp_char(network))
+    }
+}
+
+impl From<Note> for Announcement {
+    fn from(note: Note) -> Self {
+        let msg = match note {
+            Note::Public(p) => p.into_message(),
+            Note::Private(p) => p.into_message(),
+        };
+        Announcement::new(msg)
+    }
+}
+
+impl TryFrom<&Announcement> for Note {
+    type Error = anyhow::Error;
+
+    fn try_from(announcement: &Announcement) -> Result<Self> {
+        let msg = &announcement.message;
+        if msg.is_empty() {
+            bail!("Empty announcement");
+        }
+        match msg[0].value() {
+            TAG_PUBLIC => Ok(Self::Public(PublicNote::from_message(msg)?)),
+            TAG_PRIVATE => Ok(Self::Private(PrivateNote::from_message(msg)?)),
+            other => bail!("Unknown tag: {other}"),
+        }
     }
 }
 
