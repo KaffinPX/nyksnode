@@ -204,7 +204,7 @@ impl TxOutput {
                 Some(
                     receiving_address
                         .create_private_note(&utxo_content.into())
-                        .into_announcement(),
+                        .into(),
                 )
             }
         }

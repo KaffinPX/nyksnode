@@ -7,6 +7,7 @@ use crate::wallet::keys::address::Address;
 use crate::wallet::keys::key::KeyType;
 use crate::wallet::keys::schemes::generation::GenerationViewingKey;
 use crate::wallet::keys::schemes::symmetric::SymmetricViewingKey;
+use crate::wallet::notes::content::NoteContent;
 
 pub trait Decryptor {
     type Address;
@@ -18,7 +19,7 @@ pub trait Decryptor {
     // Needed to extract indices of an UTXO and see if it is/was part of mutator set.
     fn privacy_preimage(&self) -> Digest;
 
-    fn decrypt(&self, ciphertext: &[BFieldElement]) -> Result<Vec<u8>, Self::Error>;
+    fn decrypt(&self, ciphertext: &[BFieldElement]) -> Result<NoteContent, Self::Error>;
 }
 
 #[derive(Debug)]
@@ -51,7 +52,7 @@ impl Decryptor for ViewingKey {
         }
     }
 
-    fn decrypt(&self, ciphertext: &[BFieldElement]) -> Result<Vec<u8>, Self::Error> {
+    fn decrypt(&self, ciphertext: &[BFieldElement]) -> Result<NoteContent, Self::Error> {
         match self {
             ViewingKey::Generation(k) => k.decrypt(ciphertext).map_err(ViewingKeyError::Generation),
             ViewingKey::Symmetric(k) => k.decrypt(ciphertext).map_err(ViewingKeyError::Symmetric),

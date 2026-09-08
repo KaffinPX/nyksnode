@@ -187,6 +187,9 @@ pub enum GenerationDecryptError {
 
     #[error("Failed to convert BFieldElements to bytes")]
     BfeToBytes,
+
+    #[error("Failed to deserialize note content")]
+    Deserialize(#[from] bincode::Error),
 }
 
 impl Zeroize for GenerationKey {
@@ -234,7 +237,7 @@ impl Decryptor for GenerationViewingKey {
         self.privacy_preimage
     }
 
-    fn decrypt(&self, ciphertext: &[BFieldElement]) -> Result<Vec<u8>, Self::Error> {
+    fn decrypt(&self, ciphertext: &[BFieldElement]) -> Result<NoteContent, Self::Error> {
         // parse ciphertext
         if ciphertext.len() <= CIPHERTEXT_SIZE_IN_BFES {
             return Err(GenerationDecryptError::MissingNonce);
@@ -269,7 +272,7 @@ impl Decryptor for GenerationViewingKey {
             .decrypt(nonce, ciphertext_bytes.as_ref())
             .map_err(|_| GenerationDecryptError::SymmetricDecryptionFailed)?;
 
-        Ok(plaintext)
+        Ok(bincode::deserialize(&plaintext)?)
     }
 }
 

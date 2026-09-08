@@ -82,6 +82,7 @@ impl BlockProofWitness {
         let consensus_rule_set =
             ConsensusRuleSet::infer_from(block_primitive_witness.network, block_height);
         let tx_claim = single_proof_claim(txk_mast_hash, consensus_rule_set);
+        #[allow(clippy::match_wildcard_for_single_variants)]
         let tx_proof = match &block_primitive_witness.transaction().proof {
             TransactionProof::SingleProof(proof) => proof.clone(),
             _ => {

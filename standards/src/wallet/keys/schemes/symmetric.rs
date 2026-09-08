@@ -171,6 +171,9 @@ pub enum SymmetricDecryptError {
 
     #[error("Decryption failed")]
     Decryption(#[from] aes_gcm::Error),
+
+    #[error("Failed to deserialize note content")]
+    Deserialize(#[from] bincode::Error),
 }
 
 impl Zeroize for SymmetricKey {
@@ -218,7 +221,7 @@ impl Decryptor for SymmetricViewingKey {
         self.privacy_preimage
     }
 
-    fn decrypt(&self, ciphertext: &[BFieldElement]) -> Result<Vec<u8>, Self::Error> {
+    fn decrypt(&self, ciphertext: &[BFieldElement]) -> Result<NoteContent, Self::Error> {
         const NONCE_LEN: usize = 1;
 
         if ciphertext.len() <= NONCE_LEN {
@@ -236,7 +239,7 @@ impl Decryptor for SymmetricViewingKey {
         let cipher = Aes256Gcm::new(&self.key);
         let plaintext = cipher.decrypt(nonce, ciphertext_bytes.as_ref())?;
 
-        Ok(plaintext)
+        Ok(bincode::deserialize(&plaintext)?)
     }
 }
 

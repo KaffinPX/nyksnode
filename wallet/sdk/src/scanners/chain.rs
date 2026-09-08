@@ -14,9 +14,13 @@ use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 use nyks_rpc_client::wallet::block::RpcWalletBlock;
 use nyks_standards::wallet::allocations::Allocations;
 use nyks_standards::wallet::keys::address::Recipient;
-use nyks_standards::wallet::keys::key::KeyType;
 use nyks_standards::wallet::keys::viewing_key::Decryptor;
 use nyks_standards::wallet::keys::viewing_key::ViewingKey;
+use nyks_standards::wallet::notes::content::NoteContent;
+use nyks_standards::wallet::notes::content::UtxoContent;
+use nyks_standards::wallet::notes::note::Note;
+use nyks_standards::wallet::notes::note::PrivateNote;
+use nyks_standards::wallet::notes::note::PublicNote;
 use thiserror::Error;
 
 use crate::state::utxos::IncomingUtxo;
@@ -261,27 +265,38 @@ impl ChainScanner {
             .iter()
             .flat_map(|key| {
                 let receiver_identifier = key.address().receiver_identifier();
+                let receiver_preimage = key.privacy_preimage();
+
                 announcements
                     .iter()
-                    .filter(|a| {
-                        KeyType::from_announcement(*a) == Some(KeyType::from(key))
-                            && extract_receiver_identifier(a) == Some(receiver_identifier)
+                    .filter(|a| extract_receiver_identifier(a) == Some(receiver_identifier))
+                    // Malformed / foreign announcements should just get skipped.
+                    .filter_map(|a| Note::try_from(a).ok())
+                    .filter_map(|note| Self::note_content(key, note))
+                    .filter_map(|content| match content {
+                        NoteContent::Utxo(UtxoContent {
+                            utxo,
+                            sender_randomness,
+                        }) => Some((utxo, sender_randomness, receiver_preimage)),
                     })
-                    .filter_map(|a| extract_ciphertext(a))
-                    .filter_map(|ciphertext| key.decrypt(&ciphertext).ok())
-                    .map(|decrypted: Vec<u8>| {
-                        let (utxo, sender_randomness): (Utxo, Digest) =
-                            bincode::deserialize(&decrypted).unwrap();
-                        (utxo, sender_randomness, key.privacy_preimage())
-                    })
-                    // A third party can create an announcement that decrypts under this key but
-                    // contains a UTXO that is unspendable by us.
+                    // A third party can craft a note that decrypts under this key but
+                    // whose UTXO isn't actually spendable by us.
                     .filter(|(utxo, _, _)| {
                         utxo.lock_script_hash() == key.address().lock_script().hash()
                     })
                     .collect::<Vec<_>>()
             })
             .collect()
+    }
+
+    /// Recovers the plaintext [`NoteContent`] of a note, decrypting it first if necessary.
+    fn note_content(key: &ViewingKey, note: Note) -> Option<NoteContent> {
+        match note {
+            // Public notes carry their content in the clear.
+            Note::Public(PublicNote { content, .. }) => Some(content),
+            // Private notes must be decrypted first, then decoded the same way.
+            Note::Private(PrivateNote { ciphertext, .. }) => key.decrypt(&ciphertext).ok(),
+        }
     }
 
     fn promote_and_cleanup(&mut self) -> Vec<IncomingUtxo> {
@@ -298,13 +313,7 @@ impl ChainScanner {
     }
 }
 
+// A hacky optimization before parsing it into note.
 pub fn extract_receiver_identifier(announcement: &Announcement) -> Option<BFieldElement> {
     announcement.message.get(1).copied()
-}
-
-pub fn extract_ciphertext(announcement: &Announcement) -> Option<Vec<BFieldElement>> {
-    if announcement.message.len() <= 2 {
-        return None;
-    }
-    Some(announcement.message[2..].to_vec())
 }

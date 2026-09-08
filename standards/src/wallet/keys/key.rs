@@ -1,6 +1,4 @@
-use nyks_consensus::BFieldElement;
 use nyks_consensus::tasm_lib::prelude::Digest;
-use nyks_consensus::transaction::announcement::Announcement;
 use nyks_consensus::transaction::lock_script::LockScriptAndWitness;
 use zeroize::Zeroize;
 use zeroize::ZeroizeOnDrop;
@@ -124,22 +122,6 @@ impl From<&Key> for KeyType {
         match key {
             Key::Generation(_) => KeyType::Generation,
             Key::Symmetric(_) => KeyType::Symmetric,
-        }
-    }
-}
-
-impl From<KeyType> for BFieldElement {
-    fn from(key_type: KeyType) -> Self {
-        (key_type as u8).into()
-    }
-}
-
-impl KeyType {
-    pub fn from_announcement(announcement: &Announcement) -> Option<Self> {
-        match announcement.message.first().copied()? {
-            kt if kt == Self::Generation.into() => Some(Self::Generation),
-            kt if kt == Self::Symmetric.into() => Some(Self::Symmetric),
-            _ => None,
         }
     }
 }
