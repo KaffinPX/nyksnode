@@ -166,7 +166,7 @@ pub enum SymmetricDecryptError {
     #[error("Ciphertext too short (missing nonce)")]
     MissingNonce,
 
-    #[error("Byte conversion failed")]
+    #[error("Failed to convert BFieldElements to bytes")]
     ByteConversion,
 
     #[error("Decryption failed")]

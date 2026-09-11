@@ -170,7 +170,7 @@ impl Spender for GenerationKey {
 
 #[derive(Debug, Error)]
 pub enum GenerationDecryptError {
-    #[error("Ciphertext does not have nonce")]
+    #[error("Ciphertext too short (missing nonce)")]
     MissingNonce,
 
     #[error("Ciphertext does not have payload")]
@@ -186,7 +186,7 @@ pub enum GenerationDecryptError {
     SymmetricDecryptionFailed,
 
     #[error("Failed to convert BFieldElements to bytes")]
-    BfeToBytes,
+    ByteConversion,
 
     #[error("Failed to deserialize note content")]
     Deserialize(#[from] bincode::Error),
@@ -266,7 +266,7 @@ impl Decryptor for GenerationViewingKey {
         let nonce = Nonce::from_slice(&nonce_as_bytes);
 
         let ciphertext_bytes =
-            bfes_to_bytes(dem_ctxt).map_err(|_| GenerationDecryptError::BfeToBytes)?;
+            bfes_to_bytes(dem_ctxt).map_err(|_| GenerationDecryptError::ByteConversion)?;
 
         let plaintext = cipher
             .decrypt(nonce, ciphertext_bytes.as_ref())
