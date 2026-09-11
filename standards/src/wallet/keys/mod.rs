@@ -83,18 +83,26 @@ pub(crate) fn bytes_to_bfes(bytes: &[u8]) -> Vec<BFieldElement> {
 
 /// Decodes a slice of BFieldElements to a vec of bytes. This method
 /// computes the inverse of `bytes_to_bfes`.
-pub(crate) fn bfes_to_bytes(bfes: &[BFieldElement]) -> Result<Vec<u8>> {
+///
+/// Fails if the number of bytes exceed 8*10^6.
+pub fn bfes_to_bytes(bfes: &[BFieldElement]) -> Result<Vec<u8>> {
+    const MAX_DECODED_LENGTH: usize = BFieldElement::BYTES * 1_000_000;
     ensure!(!bfes.is_empty(), "Cannot decode empty byte stream");
 
-    let length = bfes[0].value() as usize;
+    let claimed_length = bfes[0].value() as usize;
     ensure!(
-        length <= size_of_val(bfes),
+        claimed_length <= size_of_val(bfes),
         "Cannot decode byte stream shorter than length indicated. \
-        BFE slice length: {}, indicated byte stream length: {length}",
+        BFE slice length: {}, indicated byte stream length: {claimed_length}",
         bfes.len(),
     );
 
-    let mut bytes: Vec<u8> = Vec::with_capacity(length);
+    ensure!(
+        claimed_length <= MAX_DECODED_LENGTH,
+        "Claimed length must not exceed {MAX_DECODED_LENGTH}"
+    );
+
+    let mut bytes: Vec<u8> = Vec::with_capacity(claimed_length);
     let mut skip_top = false;
     for bfe in bfes.iter().skip(1) {
         let bfe_bytes = bfe.value().to_be_bytes();
@@ -111,5 +119,10 @@ pub(crate) fn bfes_to_bytes(bfes: &[BFieldElement]) -> Result<Vec<u8>> {
         }
     }
 
-    Ok(bytes[0..length].to_vec())
+    ensure!(
+        claimed_length <= bytes.len(),
+        "Claimed length cannot exceed actual length when decoding bytes"
+    );
+
+    Ok(bytes[0..claimed_length].to_vec())
 }
