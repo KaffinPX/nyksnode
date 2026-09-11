@@ -59,11 +59,11 @@ happy: clippy format
 	cargo test --doc
 
 install: ensure-clang
-	cargo install --force --locked --path nyks-node/
-	cargo install --force --locked --path nyks-prover/
-	cargo install --force --locked --path nyks-wallet/
-	cargo install --force --locked --path nyks-composer/
-	cargo install --force --locked --path nyks-upgrader/
+	cargo install --force --locked --path node/
+	cargo install --force --locked --path prover/
+	cargo install --force --locked --path wallet/
+	cargo install --force --locked --path composer/
+	cargo install --force --locked --path upgrader/
 
 clippy:
 	cargo clippy --all-targets -- -D warnings
