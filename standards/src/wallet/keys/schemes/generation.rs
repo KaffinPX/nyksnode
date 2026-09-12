@@ -23,8 +23,8 @@ use zeroize::ZeroizeOnDrop;
 
 use crate::wallet::keys::address::Bech32mDecodeError;
 use crate::wallet::keys::address::Recipient;
-use crate::wallet::keys::bfes_to_bytes;
-use crate::wallet::keys::bytes_to_bfes;
+use crate::wallet::keys::bfes_to_bytes_packed;
+use crate::wallet::keys::bytes_to_bfes_packed;
 use crate::wallet::keys::deterministically_derive_seed_and_nonce;
 use crate::wallet::keys::key::Spender;
 use crate::wallet::keys::network_hrp_char;
@@ -71,7 +71,7 @@ impl GenerationAddress {
         let nonce_as_bytes = [nonce_bfe.value().to_be_bytes().to_vec(), vec![0u8; 4]].concat();
         let nonce = Nonce::from_slice(&nonce_as_bytes); // almost 64 bits; unique per message
         let ciphertext = cipher.encrypt(nonce, plaintext.as_ref()).unwrap();
-        let ciphertext_bfes = bytes_to_bfes(&ciphertext);
+        let ciphertext_bfes = bytes_to_bfes_packed(&ciphertext);
 
         // concatenate and return
         [
@@ -266,7 +266,7 @@ impl Decryptor for GenerationViewingKey {
         let nonce = Nonce::from_slice(&nonce_as_bytes);
 
         let ciphertext_bytes =
-            bfes_to_bytes(dem_ctxt).map_err(|_| GenerationDecryptError::ByteConversion)?;
+            bfes_to_bytes_packed(dem_ctxt).map_err(|_| GenerationDecryptError::ByteConversion)?;
 
         let plaintext = cipher
             .decrypt(nonce, ciphertext_bytes.as_ref())

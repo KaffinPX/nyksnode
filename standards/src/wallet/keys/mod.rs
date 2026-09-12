@@ -61,7 +61,7 @@ pub(crate) fn shake256<const NUM_OUT_BYTES: usize>(
 
 /// Encodes a slice of bytes to a vec of BFieldElements. This
 /// encoding is injective but not uniform-to-uniform.
-pub(crate) fn bytes_to_bfes(bytes: &[u8]) -> Vec<BFieldElement> {
+pub(crate) fn bytes_to_bfes_packed(bytes: &[u8]) -> Vec<BFieldElement> {
     let mut padded_bytes = bytes.to_vec();
     while !padded_bytes.len().is_multiple_of(8) {
         padded_bytes.push(0u8);
@@ -85,7 +85,7 @@ pub(crate) fn bytes_to_bfes(bytes: &[u8]) -> Vec<BFieldElement> {
 /// computes the inverse of `bytes_to_bfes`.
 ///
 /// Fails if the number of bytes exceed 8*10^6.
-pub fn bfes_to_bytes(bfes: &[BFieldElement]) -> Result<Vec<u8>> {
+pub fn bfes_to_bytes_packed(bfes: &[BFieldElement]) -> Result<Vec<u8>> {
     const MAX_DECODED_LENGTH: usize = BFieldElement::BYTES * 1_000_000;
     ensure!(!bfes.is_empty(), "Cannot decode empty byte stream");
 

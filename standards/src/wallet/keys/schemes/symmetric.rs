@@ -20,8 +20,8 @@ use zeroize::ZeroizeOnDrop;
 
 use crate::wallet::keys::address::Bech32mDecodeError;
 use crate::wallet::keys::address::Recipient;
-use crate::wallet::keys::bfes_to_bytes;
-use crate::wallet::keys::bytes_to_bfes;
+use crate::wallet::keys::bfes_to_bytes_packed;
+use crate::wallet::keys::bytes_to_bfes_packed;
 use crate::wallet::keys::deterministically_derive_seed_and_nonce;
 use crate::wallet::keys::key::Spender;
 use crate::wallet::keys::network_hrp_char;
@@ -68,7 +68,7 @@ impl SymmetricAddress {
         let ciphertext = cipher.encrypt(nonce, plaintext.as_ref()).unwrap();
 
         // 4. convert to BFEs
-        let ciphertext_bfes = bytes_to_bfes(&ciphertext);
+        let ciphertext_bfes = bytes_to_bfes_packed(&ciphertext);
 
         // 5. return nonce + ciphertext
         [&[nonce_bfe], ciphertext_bfes.as_slice()].concat()
@@ -234,7 +234,7 @@ impl Decryptor for SymmetricViewingKey {
         let nonce = Nonce::from_slice(&nonce_bytes);
 
         let ciphertext_bytes =
-            bfes_to_bytes(ciphertext).map_err(|_| SymmetricDecryptError::ByteConversion)?;
+            bfes_to_bytes_packed(ciphertext).map_err(|_| SymmetricDecryptError::ByteConversion)?;
 
         let cipher = Aes256Gcm::new(&self.key);
         let plaintext = cipher.decrypt(nonce, ciphertext_bytes.as_ref())?;

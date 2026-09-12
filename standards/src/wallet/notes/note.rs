@@ -1,5 +1,4 @@
 use anyhow::Result;
-use anyhow::bail;
 use anyhow::ensure;
 use bech32::FromBase32;
 use bech32::ToBase32;
@@ -9,9 +8,13 @@ use nyks_consensus::transaction::announcement::Announcement;
 use nyks_consensus::twenty_first::math::bfield_codec::BFieldCodec;
 use serde::Deserialize;
 use serde::Serialize;
+use thiserror::Error;
 
 use crate::wallet::keys::network_hrp_char;
+use crate::wallet::notes::bfes_to_bytes_raw;
+use crate::wallet::notes::bytes_to_bfes_raw;
 use crate::wallet::notes::content::NoteContent;
+use crate::wallet::notes::content::NoteContentError;
 
 pub(crate) const TAG_PUBLIC: u64 = 0;
 pub(crate) const TAG_PRIVATE: u64 = 1;
@@ -29,26 +32,44 @@ impl PublicNote {
             content,
         }
     }
+}
 
-    pub fn into_message(self) -> Vec<BFieldElement> {
+#[derive(Debug, Error)]
+pub enum PublicNoteError {
+    #[error("public note too short")]
+    TooShort,
+
+    #[error("expected public tag, got {0}")]
+    WrongTag(u64),
+
+    #[error("failed to decode note content: {0}")]
+    Content(#[from] NoteContentError),
+}
+
+impl BFieldCodec for PublicNote {
+    type Error = PublicNoteError;
+
+    fn encode(&self) -> Vec<BFieldElement> {
         let mut msg = vec![BFieldElement::new(TAG_PUBLIC), self.receiver_id];
         msg.extend(self.content.encode());
         msg
     }
 
-    pub fn from_message(data: &[BFieldElement]) -> Result<Self> {
+    fn decode(data: &[BFieldElement]) -> Result<Box<Self>, Self::Error> {
         if data.len() < 2 {
-            bail!("Public note too short");
+            return Err(PublicNoteError::TooShort);
         }
+
         if data[0].value() != TAG_PUBLIC {
-            bail!("Expected public tag, got {}", data[0].value());
+            return Err(PublicNoteError::WrongTag(data[0].value()));
         }
-        let receiver_id = data[1];
+
         let content = *NoteContent::decode(&data[2..])?;
-        Ok(Self {
-            receiver_id,
-            content,
-        })
+        Ok(Box::new(Self { receiver_id: data[1], content }))
+    }
+
+    fn static_length() -> Option<usize> {
+        None
     }
 }
 
@@ -65,26 +86,40 @@ impl PrivateNote {
             ciphertext,
         }
     }
+}
 
-    pub fn into_message(self) -> Vec<BFieldElement> {
+#[derive(Debug, Error)]
+pub enum PrivateNoteError {
+    #[error("private note too short")]
+    TooShort,
+
+    #[error("expected private tag, got {0}")]
+    WrongTag(u64),
+}
+
+impl BFieldCodec for PrivateNote {
+    type Error = PrivateNoteError;
+
+    fn encode(&self) -> Vec<BFieldElement> {
         let mut msg = vec![BFieldElement::new(TAG_PRIVATE), self.receiver_id];
-        msg.extend(self.ciphertext);
+        msg.extend(self.ciphertext.clone());
         msg
     }
 
-    pub fn from_message(data: &[BFieldElement]) -> Result<Self> {
+    fn decode(data: &[BFieldElement]) -> Result<Box<Self>, Self::Error> {
         if data.len() < 2 {
-            bail!("Private note too short");
+            return Err(PrivateNoteError::TooShort);
         }
+
         if data[0].value() != TAG_PRIVATE {
-            bail!("Expected private tag, got {}", data[0].value());
+            return Err(PrivateNoteError::WrongTag(data[0].value()));
         }
-        let receiver_id = data[1];
-        let ciphertext = data[2..].to_vec();
-        Ok(Self {
-            receiver_id,
-            ciphertext,
-        })
+
+        Ok(Box::new(Self { receiver_id: data[1], ciphertext: data[2..].to_vec() }))
+    }
+
+    fn static_length() -> Option<usize> {
+        None
     }
 }
 
@@ -92,6 +127,21 @@ impl PrivateNote {
 pub enum Note {
     Public(PublicNote),
     Private(PrivateNote),
+}
+
+#[derive(Debug, Error)]
+pub enum NoteError {
+    #[error("empty note")]
+    Empty,
+
+    #[error("unknown note tag: {0}")]
+    UnknownTag(u64),
+
+    #[error(transparent)]
+    Public(#[from] PublicNoteError),
+
+    #[error(transparent)]
+    Private(#[from] PrivateNoteError),
 }
 
 impl Note {
@@ -112,26 +162,18 @@ impl Note {
 
     pub fn into_bech32m(self, network: Network) -> String {
         let hrp = Self::hrp(network);
-        let msg = Announcement::from(self).message;
-        let payload =
-            bincode::serialize(&msg).expect("BFieldElement vec serialization never fails");
-        let payload_base32 = payload.to_base32();
-        bech32::encode(&hrp, payload_base32, bech32::Variant::Bech32m)
+        let bytes = bfes_to_bytes_raw(&self.encode());
+        bech32::encode(&hrp, bytes.to_base32(), bech32::Variant::Bech32m)
             .expect("bech32m encoding never fails")
     }
 
     pub fn from_bech32m(encoded: &str, network: Network) -> Result<Self> {
         let (hrp, data, variant) = bech32::decode(encoded)?;
-        ensure!(
-            variant == bech32::Variant::Bech32m,
-            "Only bech32m is supported"
-        );
+        ensure!(variant == bech32::Variant::Bech32m, "Only bech32m is supported");
         ensure!(hrp == Self::hrp(network), "Invalid HRP for network");
-        let payload = Vec::<u8>::from_base32(&data)?;
-        let msg: Vec<BFieldElement> = bincode::deserialize(&payload)
-            .map_err(|e| anyhow::anyhow!("Failed to deserialize bech32 payload: {e}"))?;
-        let announcement = Announcement::new(msg);
-        Self::try_from(&announcement)
+        let bytes = Vec::<u8>::from_base32(&data)?;
+        let msg = bytes_to_bfes_raw(&bytes)?;
+        Ok(*Note::decode(&msg)?)
     }
 
     fn hrp(network: Network) -> String {
@@ -139,29 +181,39 @@ impl Note {
     }
 }
 
-impl From<Note> for Announcement {
-    fn from(note: Note) -> Self {
-        let msg = match note {
-            Note::Public(p) => p.into_message(),
-            Note::Private(p) => p.into_message(),
-        };
-        Announcement::new(msg)
+impl BFieldCodec for Note {
+    type Error = NoteError;
+
+    fn encode(&self) -> Vec<BFieldElement> {
+        match self {
+            Self::Public(p) => p.encode(),
+            Self::Private(p) => p.encode(),
+        }
+    }
+
+    fn decode(data: &[BFieldElement]) -> Result<Box<Self>, Self::Error> {
+        match data.first().ok_or(NoteError::Empty)?.value() {
+            TAG_PUBLIC => Ok(Box::new(Self::Public(*PublicNote::decode(data)?))),
+            TAG_PRIVATE => Ok(Box::new(Self::Private(*PrivateNote::decode(data)?))),
+            other => Err(NoteError::UnknownTag(other)),
+        }
+    }
+
+    fn static_length() -> Option<usize> {
+        None
+    }
+}
+
+impl From<&Note> for Announcement {
+    fn from(note: &Note) -> Self {
+        Announcement::new(note.encode())
     }
 }
 
 impl TryFrom<&Announcement> for Note {
-    type Error = anyhow::Error;
-
-    fn try_from(announcement: &Announcement) -> Result<Self> {
-        let msg = &announcement.message;
-        if msg.is_empty() {
-            bail!("Empty announcement");
-        }
-        match msg[0].value() {
-            TAG_PUBLIC => Ok(Self::Public(PublicNote::from_message(msg)?)),
-            TAG_PRIVATE => Ok(Self::Private(PrivateNote::from_message(msg)?)),
-            other => bail!("Unknown tag: {other}"),
-        }
+    type Error = NoteError;
+    fn try_from(a: &Announcement) -> Result<Self, Self::Error> {
+        Note::decode(&a.message).map(|b| *b)
     }
 }
 
