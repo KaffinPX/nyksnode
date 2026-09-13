@@ -90,7 +90,7 @@ impl Recipient for GenerationAddress {
         if variant != Variant::Bech32m {
             return Err(Bech32mDecodeError::InvalidVariant);
         }
-        if hrp[0..=5] != Self::prefix(network) {
+        if hrp != Self::prefix(network) {
             return Err(Bech32mDecodeError::InvalidHrp);
         }
 
