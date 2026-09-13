@@ -12,6 +12,7 @@ use nyks_consensus::tasm_lib::prelude::Digest;
 use nyks_consensus::tasm_lib::prelude::Tip5;
 use nyks_consensus::transaction::lock_script::LockScript;
 use nyks_consensus::transaction::lock_script::LockScriptAndWitness;
+use nyks_consensus::twenty_first::math::bfield_codec::BFieldCodec;
 use serde::Deserialize;
 use serde::Serialize;
 use thiserror::Error;
@@ -27,7 +28,10 @@ use crate::wallet::keys::key::Spender;
 use crate::wallet::keys::network_hrp_char;
 use crate::wallet::keys::shake256;
 use crate::wallet::keys::viewing_key::Decryptor;
+use crate::wallet::notes::bfes_to_bytes_raw;
+use crate::wallet::notes::bytes_to_bfes_raw;
 use crate::wallet::notes::content::NoteContent;
+use crate::wallet::notes::content::NoteContentError;
 use crate::wallet::notes::note::Note;
 use crate::wallet::notes::note::PrivateNote;
 
@@ -56,12 +60,11 @@ impl SymmetricAddress {
     fn encrypt(&self, content: &NoteContent) -> Vec<BFieldElement> {
         // 1. derive nonce deterministically
         let (_randomness, nonce_bfe) = deterministically_derive_seed_and_nonce(content);
-
         let nonce_bytes = [&nonce_bfe.value().to_be_bytes(), [0u8; 4].as_slice()].concat();
         let nonce = Nonce::from_slice(&nonce_bytes);
 
         // 2. serialize payload
-        let plaintext = bincode::serialize(content).unwrap();
+        let plaintext = bfes_to_bytes_raw(&content.encode());
 
         // 3. encrypt
         let cipher = Aes256Gcm::new(&derive_encryption_secret(&self.receiver_postimage));
@@ -161,21 +164,6 @@ impl Spender for SymmetricKey {
     }
 }
 
-#[derive(Debug, Error)]
-pub enum SymmetricDecryptError {
-    #[error("Ciphertext too short (missing nonce)")]
-    MissingNonce,
-
-    #[error("Failed to convert BFieldElements to bytes")]
-    ByteConversion,
-
-    #[error("Decryption failed")]
-    Decryption(#[from] aes_gcm::Error),
-
-    #[error("Failed to deserialize note content")]
-    Deserialize(#[from] bincode::Error),
-}
-
 impl Zeroize for SymmetricKey {
     fn zeroize(&mut self) {
         self.seed = Digest::default();
@@ -229,7 +217,6 @@ impl Decryptor for SymmetricViewingKey {
         }
 
         let (nonce_ctxt, ciphertext) = ciphertext.split_at(NONCE_LEN);
-
         let nonce_bytes = [&nonce_ctxt[0].value().to_be_bytes(), [0u8; 4].as_slice()].concat();
         let nonce = Nonce::from_slice(&nonce_bytes);
 
@@ -239,8 +226,25 @@ impl Decryptor for SymmetricViewingKey {
         let cipher = Aes256Gcm::new(&self.key);
         let plaintext = cipher.decrypt(nonce, ciphertext_bytes.as_ref())?;
 
-        Ok(bincode::deserialize(&plaintext)?)
+        let msg =
+            bytes_to_bfes_raw(&plaintext).map_err(|_| SymmetricDecryptError::ByteConversion)?;
+        Ok(*NoteContent::decode(&msg)?)
     }
+}
+
+#[derive(Debug, Error)]
+pub enum SymmetricDecryptError {
+    #[error("Ciphertext too short (missing nonce)")]
+    MissingNonce,
+
+    #[error("Failed to convert BFieldElements to bytes")]
+    ByteConversion,
+
+    #[error("Decryption failed")]
+    Decryption(#[from] aes_gcm::Error),
+
+    #[error("Failed to decode note content")]
+    Content(#[from] NoteContentError),
 }
 
 impl Zeroize for SymmetricViewingKey {

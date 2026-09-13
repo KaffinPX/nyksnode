@@ -65,7 +65,10 @@ impl BFieldCodec for PublicNote {
         }
 
         let content = *NoteContent::decode(&data[2..])?;
-        Ok(Box::new(Self { receiver_id: data[1], content }))
+        Ok(Box::new(Self {
+            receiver_id: data[1],
+            content,
+        }))
     }
 
     fn static_length() -> Option<usize> {
@@ -115,7 +118,10 @@ impl BFieldCodec for PrivateNote {
             return Err(PrivateNoteError::WrongTag(data[0].value()));
         }
 
-        Ok(Box::new(Self { receiver_id: data[1], ciphertext: data[2..].to_vec() }))
+        Ok(Box::new(Self {
+            receiver_id: data[1],
+            ciphertext: data[2..].to_vec(),
+        }))
     }
 
     fn static_length() -> Option<usize> {
@@ -169,7 +175,10 @@ impl Note {
 
     pub fn from_bech32m(encoded: &str, network: Network) -> Result<Self> {
         let (hrp, data, variant) = bech32::decode(encoded)?;
-        ensure!(variant == bech32::Variant::Bech32m, "Only bech32m is supported");
+        ensure!(
+            variant == bech32::Variant::Bech32m,
+            "Only bech32m is supported"
+        );
         ensure!(hrp == Self::hrp(network), "Invalid HRP for network");
         let bytes = Vec::<u8>::from_base32(&data)?;
         let msg = bytes_to_bfes_raw(&bytes)?;

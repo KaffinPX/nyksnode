@@ -201,10 +201,9 @@ impl TxOutput {
             UtxoNotificationMethod::OffChain(_) => None,
             UtxoNotificationMethod::OnChain(receiving_address) => {
                 let utxo_content = self.note_content();
-                Some(
-                    Announcement::from(&receiving_address
-                        .create_private_note(&utxo_content.into()))
-                )
+                Some(Announcement::from(
+                    &receiving_address.create_private_note(&utxo_content.into()),
+                ))
             }
         }
     }

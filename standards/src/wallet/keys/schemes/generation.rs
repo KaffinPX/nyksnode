@@ -11,6 +11,7 @@ use nyks_consensus::tasm_lib::prelude::Digest;
 use nyks_consensus::tasm_lib::prelude::Tip5;
 use nyks_consensus::transaction::lock_script::LockScript;
 use nyks_consensus::transaction::lock_script::LockScriptAndWitness;
+use nyks_consensus::twenty_first::math::bfield_codec::BFieldCodec;
 use nyks_consensus::twenty_first::math::lattice;
 use nyks_consensus::twenty_first::math::lattice::kem::CIPHERTEXT_SIZE_IN_BFES;
 use nyks_consensus::twenty_first::math::lattice::kem::PublicKey;
@@ -30,7 +31,10 @@ use crate::wallet::keys::key::Spender;
 use crate::wallet::keys::network_hrp_char;
 use crate::wallet::keys::shake256;
 use crate::wallet::keys::viewing_key::Decryptor;
+use crate::wallet::notes::bfes_to_bytes_raw;
+use crate::wallet::notes::bytes_to_bfes_raw;
 use crate::wallet::notes::content::NoteContent;
+use crate::wallet::notes::content::NoteContentError;
 use crate::wallet::notes::note::Note;
 use crate::wallet::notes::note::PrivateNote;
 
@@ -64,7 +68,7 @@ impl GenerationAddress {
         let (shared_key, kem_ctxt) = lattice::kem::enc(self.encryption_key, randomness);
 
         // convert payload to bytes
-        let plaintext = bincode::serialize(payload).unwrap();
+        let plaintext = bfes_to_bytes_raw(&payload.encode());
 
         // generate symmetric ciphertext
         let cipher = Aes256Gcm::new(&shared_key.into());
@@ -168,30 +172,6 @@ impl Spender for GenerationKey {
     }
 }
 
-#[derive(Debug, Error)]
-pub enum GenerationDecryptError {
-    #[error("Ciphertext too short (missing nonce)")]
-    MissingNonce,
-
-    #[error("Ciphertext does not have payload")]
-    MissingPayload,
-
-    #[error("Failed to convert ciphertext slice")]
-    SliceConversion,
-
-    #[error("Could not establish shared secret key")]
-    KemDecryptionFailed,
-
-    #[error("Failed to decrypt symmetric payload")]
-    SymmetricDecryptionFailed,
-
-    #[error("Failed to convert BFieldElements to bytes")]
-    ByteConversion,
-
-    #[error("Failed to deserialize note content")]
-    Deserialize(#[from] bincode::Error),
-}
-
 impl Zeroize for GenerationKey {
     fn zeroize(&mut self) {
         self.seed = Digest::default();
@@ -272,8 +252,34 @@ impl Decryptor for GenerationViewingKey {
             .decrypt(nonce, ciphertext_bytes.as_ref())
             .map_err(|_| GenerationDecryptError::SymmetricDecryptionFailed)?;
 
-        Ok(bincode::deserialize(&plaintext)?)
+        let msg =
+            bytes_to_bfes_raw(&plaintext).map_err(|_| GenerationDecryptError::ByteConversion)?;
+        Ok(*NoteContent::decode(&msg)?)
     }
+}
+
+#[derive(Debug, Error)]
+pub enum GenerationDecryptError {
+    #[error("Ciphertext too short (missing nonce)")]
+    MissingNonce,
+
+    #[error("Ciphertext does not have payload")]
+    MissingPayload,
+
+    #[error("Failed to convert ciphertext slice")]
+    SliceConversion,
+
+    #[error("Could not establish shared secret key")]
+    KemDecryptionFailed,
+
+    #[error("Failed to decrypt symmetric payload")]
+    SymmetricDecryptionFailed,
+
+    #[error("Failed to convert BFieldElements to bytes")]
+    ByteConversion,
+
+    #[error("Failed to decode note content")]
+    Content(#[from] NoteContentError),
 }
 
 impl Zeroize for GenerationViewingKey {
