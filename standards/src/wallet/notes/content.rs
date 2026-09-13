@@ -96,3 +96,47 @@ impl BFieldCodec for NoteContent {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn dummy_content() -> UtxoContent {
+        UtxoContent::new(Utxo::empty_dummy(), Digest::default())
+    }
+
+    #[test]
+    fn utxo_content_round_trips_through_note_content() {
+        let utxo_content = dummy_content();
+        let note_content: NoteContent = utxo_content.clone().into();
+
+        // discriminant() + the From<UtxoContent> impl
+        assert_eq!(note_content.discriminant(), UtxoContent::DISCRIMINANT);
+        assert_eq!(note_content, NoteContent::Utxo(utxo_content));
+
+        // encode(): discriminant is written first
+        let encoded = note_content.encode();
+        assert_eq!(encoded[0], BFieldElement::new(UtxoContent::DISCRIMINANT));
+
+        // decode(): success path, including the `Self::Utxo` reconstruction
+        let decoded = *NoteContent::decode(&encoded).expect("valid encoding must decode");
+        assert_eq!(decoded, note_content);
+    }
+
+    #[test]
+    fn decode_rejects_invalid_sequences() {
+        // Empty sequence: no discriminant element at all.
+        let err = NoteContent::decode(&[]).unwrap_err();
+        assert!(matches!(err, NoteContentError::EmptySequence));
+
+        // Unknown discriminant: valid element, but not one we recognize.
+        let err = NoteContent::decode(&[BFieldElement::new(67)]).unwrap_err();
+        assert!(matches!(err, NoteContentError::UnknownDiscriminant(67)));
+
+        // Known discriminant, but the payload behind it is truncated, so the
+        // inner UtxoContent::decode fails and gets wrapped as `Decode`.
+        let err =
+            NoteContent::decode(&[BFieldElement::new(UtxoContent::DISCRIMINANT)]).unwrap_err();
+        assert!(matches!(err, NoteContentError::Decode(_)));
+    }
+}
