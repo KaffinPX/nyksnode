@@ -237,3 +237,113 @@ impl From<PrivateNote> for Note {
         Self::Private(n)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::wallet::notes::content::UtxoContent;
+    use nyks_consensus::transaction::utxo::Utxo;
+    use nyks_consensus::twenty_first::tip5::Digest;
+
+    fn dummy_content() -> NoteContent {
+        NoteContent::Utxo(UtxoContent::new(Utxo::empty_dummy(), Digest::default()))
+    }
+
+    fn dummy_public() -> PublicNote {
+        // TODO: add test-helpers and use dummy_content fn from other tests.
+        PublicNote::new(BFieldElement::new(6), dummy_content())
+    }
+
+    fn dummy_private() -> PrivateNote {
+        PrivateNote::new(BFieldElement::new(7), vec![BFieldElement::new(42)])
+    }
+
+    #[test]
+    fn public_note_codec() {
+        let note = dummy_public();
+        let encoded = note.encode();
+        assert_eq!(encoded[0], BFieldElement::new(TAG_PUBLIC));
+        assert_eq!(*PublicNote::decode(&encoded).unwrap(), note);
+        assert_eq!(PublicNote::static_length(), None);
+
+        assert!(matches!(PublicNote::decode(&[]).unwrap_err(), PublicNoteError::TooShort));
+        assert!(matches!(
+            PublicNote::decode(&[BFieldElement::new(TAG_PRIVATE), BFieldElement::new(1)]).unwrap_err(),
+            PublicNoteError::WrongTag(t) if t == TAG_PRIVATE
+        ));
+
+        // 99 isn't a valid NoteContent discriminant, so this exercises the
+        // #[from] NoteContentError -> PublicNoteError::Content conversion.
+        let err = PublicNote::decode(&[BFieldElement::new(TAG_PUBLIC), BFieldElement::new(1), BFieldElement::new(99)])
+            .unwrap_err();
+        assert!(matches!(err, PublicNoteError::Content(_)));
+    }
+
+    #[test]
+    fn private_note_codec() {
+        let note = dummy_private();
+        let encoded = note.encode();
+        assert_eq!(encoded[0], BFieldElement::new(TAG_PRIVATE));
+        assert_eq!(*PrivateNote::decode(&encoded).unwrap(), note);
+        assert_eq!(PrivateNote::static_length(), None);
+
+        assert!(matches!(PrivateNote::decode(&[BFieldElement::new(TAG_PRIVATE)]).unwrap_err(), PrivateNoteError::TooShort));
+        assert!(matches!(
+            PrivateNote::decode(&[BFieldElement::new(TAG_PUBLIC), BFieldElement::new(1)]).unwrap_err(),
+            PrivateNoteError::WrongTag(t) if t == TAG_PUBLIC
+        ));
+    }
+
+    #[test]
+    fn note_wraps_variants_and_round_trips() {
+        let public: Note = dummy_public().into();
+        let private: Note = dummy_private().into();
+
+        assert_eq!(public.receiver_id(), dummy_public().receiver_id);
+        assert!(public.is_public() && !public.is_private());
+        assert!(private.is_private() && !private.is_public());
+
+        assert_eq!(*Note::decode(&public.encode()).unwrap(), public);
+        assert_eq!(*Note::decode(&private.encode()).unwrap(), private);
+        assert_eq!(Note::static_length(), None);
+
+        // Announcement <-> Note conversions round-trip through the same encode/decode.
+        let announcement = Announcement::from(&public);
+        assert_eq!(Note::try_from(&announcement).unwrap(), public);
+    }
+
+    #[test]
+    fn note_decode_errors() {
+        assert!(matches!(Note::decode(&[]).unwrap_err(), NoteError::Empty));
+        assert!(matches!(Note::decode(&[BFieldElement::new(2)]).unwrap_err(), NoteError::UnknownTag(2)));
+        // Tag alone, no receiver id: inner decode fails and propagates via #[from].
+        assert!(matches!(
+            Note::decode(&[BFieldElement::new(TAG_PUBLIC)]).unwrap_err(),
+            NoteError::Public(PublicNoteError::TooShort)
+        ));
+        assert!(matches!(
+            Note::decode(&[BFieldElement::new(TAG_PRIVATE)]).unwrap_err(),
+            NoteError::Private(PrivateNoteError::TooShort)
+        ));
+    }
+
+    #[test]
+    fn note_bech32m() {
+        let note: Note = dummy_public().into();
+        let encoded = note.clone().into_bech32m(Network::Main);
+        assert_eq!(Note::from_bech32m(&encoded, Network::Main).unwrap(), note);
+
+        assert!(Note::from_bech32m("not-bech32", Network::Main).is_err());
+
+        let bytes = bfes_to_bytes_raw(&note.encode());
+        let hrp = format!("note{}", network_hrp_char(Network::Main));
+
+        // Right HRP, wrong bech32 variant -> fails the variant check.
+        let wrong_variant = bech32::encode(&hrp, bytes.to_base32(), bech32::Variant::Bech32).unwrap();
+        assert!(Note::from_bech32m(&wrong_variant, Network::Main).is_err());
+
+        // Right variant, wrong HRP -> fails the network check.
+        let wrong_hrp = bech32::encode("wrong", bytes.to_base32(), bech32::Variant::Bech32m).unwrap();
+        assert!(Note::from_bech32m(&wrong_hrp, Network::Main).is_err());
+    }
+}
