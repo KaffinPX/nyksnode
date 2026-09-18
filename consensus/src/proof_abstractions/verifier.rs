@@ -50,9 +50,9 @@ static CLAIMS_CACHE_ENABLED: std::sync::LazyLock<tokio::sync::Mutex<bool>> =
 /// parameters exist for that padded height.
 fn expected_num_proof_items(stark: Stark, proof: &VmProof) -> Option<usize> {
     /// Items read outside of FRI: the padded height, three Merkle roots, four
-    /// out-of-domain rows, the out-of-domain quotient segments, and, for each of
+    /// out-of-domain rows, two out-of-domain quotient segments, and, for each of
     /// the three tables, the revealed rows plus their authentication structure.
-    const NUM_ITEMS_OUTSIDE_FRI: usize = 15;
+    const NUM_ITEMS_OUTSIDE_FRI: usize = 16;
 
     /// Items read by FRI independently of the number of rounds: the Merkle root
     /// of the first round, the last round's codeword and polynomial, and the
