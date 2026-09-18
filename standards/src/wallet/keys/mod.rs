@@ -7,7 +7,7 @@ use sha3::Shake256;
 use sha3::digest::ExtendableOutput;
 use sha3::digest::Update;
 
-use crate::wallet::notes::utxo_notification::UtxoNotificationPayload;
+use crate::wallet::notes::content::NoteContent;
 
 pub mod address;
 pub mod key;
@@ -29,17 +29,21 @@ pub(crate) fn network_hrp_char(network: Network) -> char {
 /// reuse proofs for tests. These values are used in the encryption
 /// step.
 pub(crate) fn deterministically_derive_seed_and_nonce(
-    payload: &UtxoNotificationPayload,
+    content: &NoteContent,
 ) -> ([u8; 32], BFieldElement) {
-    let combined = Tip5::hash_pair(payload.sender_randomness, payload.utxo.lock_script_hash());
-    let [e0, e1, e2, e3, e4] = combined.values();
-    let e0: [u8; 8] = e0.into();
-    let e1: [u8; 8] = e1.into();
-    let e2: [u8; 8] = e2.into();
-    let e3: [u8; 8] = e3.into();
-    let seed: [u8; 32] = [e0, e1, e2, e3].concat().try_into().unwrap();
+    match content {
+        NoteContent::Utxo(u) => {
+            let combined = Tip5::hash_pair(u.sender_randomness, Tip5::hash(&u.utxo));
+            let [e0, e1, e2, e3, e4] = combined.values();
+            let e0: [u8; 8] = e0.into();
+            let e1: [u8; 8] = e1.into();
+            let e2: [u8; 8] = e2.into();
+            let e3: [u8; 8] = e3.into();
+            let seed: [u8; 32] = [e0, e1, e2, e3].concat().try_into().unwrap();
 
-    (seed, e4)
+            (seed, e4)
+        }
+    }
 }
 
 // note: copied from twenty_first::math::lattice::kem::shake256()
@@ -57,7 +61,7 @@ pub(crate) fn shake256<const NUM_OUT_BYTES: usize>(
 
 /// Encodes a slice of bytes to a vec of BFieldElements. This
 /// encoding is injective but not uniform-to-uniform.
-pub(crate) fn bytes_to_bfes(bytes: &[u8]) -> Vec<BFieldElement> {
+pub(crate) fn bytes_to_bfes_packed(bytes: &[u8]) -> Vec<BFieldElement> {
     let mut padded_bytes = bytes.to_vec();
     while !padded_bytes.len().is_multiple_of(8) {
         padded_bytes.push(0u8);
@@ -79,18 +83,26 @@ pub(crate) fn bytes_to_bfes(bytes: &[u8]) -> Vec<BFieldElement> {
 
 /// Decodes a slice of BFieldElements to a vec of bytes. This method
 /// computes the inverse of `bytes_to_bfes`.
-pub(crate) fn bfes_to_bytes(bfes: &[BFieldElement]) -> Result<Vec<u8>> {
+///
+/// Fails if the number of bytes exceed 8*10^6.
+pub fn bfes_to_bytes_packed(bfes: &[BFieldElement]) -> Result<Vec<u8>> {
+    const MAX_DECODED_LENGTH: usize = BFieldElement::BYTES * 1_000_000;
     ensure!(!bfes.is_empty(), "Cannot decode empty byte stream");
 
-    let length = bfes[0].value() as usize;
+    let claimed_length = bfes[0].value() as usize;
     ensure!(
-        length <= size_of_val(bfes),
+        claimed_length <= size_of_val(bfes),
         "Cannot decode byte stream shorter than length indicated. \
-        BFE slice length: {}, indicated byte stream length: {length}",
+        BFE slice length: {}, indicated byte stream length: {claimed_length}",
         bfes.len(),
     );
 
-    let mut bytes: Vec<u8> = Vec::with_capacity(length);
+    ensure!(
+        claimed_length <= MAX_DECODED_LENGTH,
+        "Claimed length must not exceed {MAX_DECODED_LENGTH}"
+    );
+
+    let mut bytes: Vec<u8> = Vec::with_capacity(claimed_length);
     let mut skip_top = false;
     for bfe in bfes.iter().skip(1) {
         let bfe_bytes = bfe.value().to_be_bytes();
@@ -107,5 +119,10 @@ pub(crate) fn bfes_to_bytes(bfes: &[BFieldElement]) -> Result<Vec<u8>> {
         }
     }
 
-    Ok(bytes[0..length].to_vec())
+    ensure!(
+        claimed_length <= bytes.len(),
+        "Claimed length cannot exceed actual length when decoding bytes"
+    );
+
+    Ok(bytes[0..claimed_length].to_vec())
 }

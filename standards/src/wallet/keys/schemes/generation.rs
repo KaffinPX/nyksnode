@@ -9,10 +9,9 @@ use nyks_consensus::BFieldElement;
 use nyks_consensus::network::Network;
 use nyks_consensus::tasm_lib::prelude::Digest;
 use nyks_consensus::tasm_lib::prelude::Tip5;
-use nyks_consensus::transaction::announcement::Announcement;
 use nyks_consensus::transaction::lock_script::LockScript;
 use nyks_consensus::transaction::lock_script::LockScriptAndWitness;
-use nyks_consensus::transaction::utxo::Utxo;
+use nyks_consensus::twenty_first::math::bfield_codec::BFieldCodec;
 use nyks_consensus::twenty_first::math::lattice;
 use nyks_consensus::twenty_first::math::lattice::kem::CIPHERTEXT_SIZE_IN_BFES;
 use nyks_consensus::twenty_first::math::lattice::kem::PublicKey;
@@ -25,15 +24,19 @@ use zeroize::ZeroizeOnDrop;
 
 use crate::wallet::keys::address::Bech32mDecodeError;
 use crate::wallet::keys::address::Recipient;
-use crate::wallet::keys::bfes_to_bytes;
-use crate::wallet::keys::bytes_to_bfes;
+use crate::wallet::keys::bfes_to_bytes_packed;
+use crate::wallet::keys::bytes_to_bfes_packed;
 use crate::wallet::keys::deterministically_derive_seed_and_nonce;
 use crate::wallet::keys::key::Spender;
 use crate::wallet::keys::network_hrp_char;
 use crate::wallet::keys::shake256;
 use crate::wallet::keys::viewing_key::Decryptor;
-use crate::wallet::notes::encrypted_utxo_notification::EncryptedUtxoNotification;
-use crate::wallet::notes::utxo_notification::UtxoNotificationPayload;
+use crate::wallet::notes::bfes_to_bytes_raw;
+use crate::wallet::notes::bytes_to_bfes_raw;
+use crate::wallet::notes::content::NoteContent;
+use crate::wallet::notes::content::NoteContentError;
+use crate::wallet::notes::note::Note;
+use crate::wallet::notes::note::PrivateNote;
 
 pub(crate) const GENERATION_FLAG_U8: u8 = 79;
 pub const GENERATION_FLAG: BFieldElement = BFieldElement::new(GENERATION_FLAG_U8 as u64);
@@ -60,19 +63,19 @@ impl GenerationAddress {
     }
 
     // Used beneath private_note etc.
-    fn encrypt(&self, payload: &UtxoNotificationPayload) -> Vec<BFieldElement> {
+    fn encrypt(&self, payload: &NoteContent) -> Vec<BFieldElement> {
         let (randomness, nonce_bfe) = deterministically_derive_seed_and_nonce(payload);
         let (shared_key, kem_ctxt) = lattice::kem::enc(self.encryption_key, randomness);
 
         // convert payload to bytes
-        let plaintext = bincode::serialize(payload).unwrap();
+        let plaintext = bfes_to_bytes_raw(&payload.encode());
 
         // generate symmetric ciphertext
         let cipher = Aes256Gcm::new(&shared_key.into());
         let nonce_as_bytes = [nonce_bfe.value().to_be_bytes().to_vec(), vec![0u8; 4]].concat();
         let nonce = Nonce::from_slice(&nonce_as_bytes); // almost 64 bits; unique per message
         let ciphertext = cipher.encrypt(nonce, plaintext.as_ref()).unwrap();
-        let ciphertext_bfes = bytes_to_bfes(&ciphertext);
+        let ciphertext_bfes = bytes_to_bfes_packed(&ciphertext);
 
         // concatenate and return
         [
@@ -91,7 +94,7 @@ impl Recipient for GenerationAddress {
         if variant != Variant::Bech32m {
             return Err(Bech32mDecodeError::InvalidVariant);
         }
-        if hrp[0..=5] != Self::prefix(network) {
+        if hrp != Self::prefix(network) {
             return Err(Bech32mDecodeError::InvalidHrp);
         }
 
@@ -121,31 +124,8 @@ impl Recipient for GenerationAddress {
         LockScript::standard_hash_lock_from_after_image(self.lock_postimage)
     }
 
-    fn create_note_announcement(
-        &self,
-        utxo_notification_payload: &UtxoNotificationPayload,
-    ) -> Announcement {
-        let encrypted_utxo_notification = EncryptedUtxoNotification {
-            flag: GENERATION_FLAG_U8.into(),
-            receiver_identifier: self.receiver_identifier(),
-            ciphertext: self.encrypt(utxo_notification_payload),
-        };
-
-        encrypted_utxo_notification.into_announcement()
-    }
-
-    fn create_note(
-        &self,
-        utxo_notification_payload: &UtxoNotificationPayload,
-        network: Network,
-    ) -> String {
-        let encrypted_utxo_notification = EncryptedUtxoNotification {
-            flag: GENERATION_FLAG_U8.into(),
-            receiver_identifier: self.receiver_identifier(),
-            ciphertext: self.encrypt(utxo_notification_payload),
-        };
-
-        encrypted_utxo_notification.into_bech32m(network)
+    fn create_private_note(&self, content: &NoteContent) -> Note {
+        PrivateNote::new(self.receiver_identifier(), self.encrypt(content)).into()
     }
 }
 
@@ -190,30 +170,6 @@ impl Spender for GenerationKey {
     fn privacy_preimage(&self) -> Digest {
         Tip5::hash_varlen(&[self.seed.values().to_vec(), vec![BFieldElement::new(1)]].concat())
     }
-}
-
-#[derive(Debug, Error)]
-pub enum GenerationDecryptError {
-    #[error("Ciphertext does not have nonce")]
-    MissingNonce,
-
-    #[error("Ciphertext does not have payload")]
-    MissingPayload,
-
-    #[error("Failed to convert ciphertext slice")]
-    SliceConversion,
-
-    #[error("Could not establish shared secret key")]
-    KemDecryptionFailed,
-
-    #[error("Failed to decrypt symmetric payload")]
-    SymmetricDecryptionFailed,
-
-    #[error("Failed to convert BFieldElements to bytes")]
-    BfeToBytes,
-
-    #[error("Deserialization failed")]
-    Deserialization(#[from] bincode::Error),
 }
 
 impl Zeroize for GenerationKey {
@@ -261,7 +217,7 @@ impl Decryptor for GenerationViewingKey {
         self.privacy_preimage
     }
 
-    fn decrypt(&self, ciphertext: &[BFieldElement]) -> Result<(Utxo, Digest), Self::Error> {
+    fn decrypt(&self, ciphertext: &[BFieldElement]) -> Result<NoteContent, Self::Error> {
         // parse ciphertext
         if ciphertext.len() <= CIPHERTEXT_SIZE_IN_BFES {
             return Err(GenerationDecryptError::MissingNonce);
@@ -290,17 +246,40 @@ impl Decryptor for GenerationViewingKey {
         let nonce = Nonce::from_slice(&nonce_as_bytes);
 
         let ciphertext_bytes =
-            bfes_to_bytes(dem_ctxt).map_err(|_| GenerationDecryptError::BfeToBytes)?;
+            bfes_to_bytes_packed(dem_ctxt).map_err(|_| GenerationDecryptError::ByteConversion)?;
 
         let plaintext = cipher
             .decrypt(nonce, ciphertext_bytes.as_ref())
             .map_err(|_| GenerationDecryptError::SymmetricDecryptionFailed)?;
 
-        // convert plaintext to utxo and digest
-        let result = bincode::deserialize(&plaintext)?; // uses #[from]
-
-        Ok(result)
+        let msg =
+            bytes_to_bfes_raw(&plaintext).map_err(|_| GenerationDecryptError::ByteConversion)?;
+        Ok(*NoteContent::decode(&msg)?)
     }
+}
+
+#[derive(Debug, Error)]
+pub enum GenerationDecryptError {
+    #[error("Ciphertext too short (missing nonce)")]
+    MissingNonce,
+
+    #[error("Ciphertext does not have payload")]
+    MissingPayload,
+
+    #[error("Failed to convert ciphertext slice")]
+    SliceConversion,
+
+    #[error("Could not establish shared secret key")]
+    KemDecryptionFailed,
+
+    #[error("Failed to decrypt symmetric payload")]
+    SymmetricDecryptionFailed,
+
+    #[error("Failed to convert BFieldElements to bytes")]
+    ByteConversion,
+
+    #[error("Failed to decode note content")]
+    Content(#[from] NoteContentError),
 }
 
 impl Zeroize for GenerationViewingKey {

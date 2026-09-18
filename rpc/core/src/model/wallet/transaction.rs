@@ -6,8 +6,6 @@ use crate::model::block::transaction_kernel::RpcTransactionKernel;
 use crate::model::common::RpcBFieldElements;
 use nyks_consensus::transaction::Transaction;
 use nyks_consensus::transaction::TransactionProof;
-use nyks_consensus::transaction::utxo::Coin;
-use nyks_consensus::transaction::utxo::Utxo;
 use nyks_consensus::transaction::validity::nyks_proof::NyksProof;
 use nyks_consensus::transaction::validity::proof_collection::ProofCollection;
 
@@ -132,64 +130,5 @@ impl From<Transaction> for RpcTransaction {
             kernel: RpcTransactionKernel::from(&value.kernel),
             proof: value.proof.into(),
         }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct RpcCoin {
-    pub type_script_hash: Digest,
-    pub state: RpcBFieldElements,
-}
-
-impl From<Coin> for RpcCoin {
-    fn from(value: Coin) -> Self {
-        Self {
-            type_script_hash: value.type_script_hash,
-            state: value.state.into(),
-        }
-    }
-}
-
-impl From<&Coin> for RpcCoin {
-    fn from(value: &Coin) -> Self {
-        Self {
-            type_script_hash: value.type_script_hash,
-            state: value.state.to_owned().into(),
-        }
-    }
-}
-
-impl From<RpcCoin> for Coin {
-    fn from(value: RpcCoin) -> Self {
-        Self {
-            type_script_hash: value.type_script_hash,
-            state: value.state.into(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct RpcUtxo {
-    lock_script_hash: Digest,
-    coins: Vec<RpcCoin>,
-}
-
-impl From<Utxo> for RpcUtxo {
-    fn from(value: Utxo) -> Self {
-        Self {
-            lock_script_hash: value.lock_script_hash(),
-            coins: value.coins().iter().map(|x| x.into()).collect(),
-        }
-    }
-}
-
-impl From<RpcUtxo> for Utxo {
-    fn from(value: RpcUtxo) -> Self {
-        Self::new(
-            value.lock_script_hash,
-            value.coins.into_iter().map(|x| x.into()).collect(),
-        )
     }
 }

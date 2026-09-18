@@ -11,8 +11,8 @@ use clap::builder::TypedValueParser;
 use clap::Parser;
 use libp2p::multiaddr::Protocol;
 use libp2p::Multiaddr;
-use nyks_consensus::transaction::transaction_proof::TransactionProofQuality;
 use nyks_consensus::network::Network;
+use nyks_consensus::transaction::transaction_proof::TransactionProofQuality;
 use nyks_consensus::type_scripts::native_currency_amount::NativeCurrencyAmount;
 use nyks_rpc_core::api::ops::Namespace;
 use tracing::error;
@@ -270,19 +270,6 @@ pub struct Args {
     // to meaningfully suppress rapid reconnection attempts.
     #[clap(long, default_value = "1800", value_parser = duration_from_seconds_str)]
     pub reconnect_cooldown: Duration,
-
-    /// Construct and maintain a UTXO index
-    ///
-    /// If set, all announcements and inputs in all processed blocks will be
-    /// indexed in a database that enables a fast rescan for the discovery of
-    /// all balance-affecting inputs and outputs of blocks.
-    ///
-    /// If blocks have already been processed without this flag active, and the
-    /// flag is later activated, all blocks up to the current tip will be
-    /// indexed, when a new block is set as tip. This process might take some
-    /// time (tens of minutes).
-    #[clap(long)]
-    pub utxo_index: bool,
 
     /// Enable JSON/HTTP RPC.
     /// You can optionally specify an address and port (default: 127.0.0.1:9797).

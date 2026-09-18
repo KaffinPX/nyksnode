@@ -11,7 +11,6 @@ use serde::Serialize;
 use crate::state::archival_state::ARCHIVAL_BLOCK_MMR_DIRECTORY_NAME;
 use crate::state::archival_state::BLOCK_INDEX_DB_NAME;
 use crate::state::archival_state::MUTATOR_SET_DIRECTORY_NAME;
-use crate::state::archival_state::UTXO_INDEX_DIRECTORY_NAME;
 use crate::state::database::DATABASE_DIRECTORY_ROOT_NAME;
 use crate::state::networking_state::BANNED_IPS_DB_NAME;
 use crate::state::shared::BLOCK_FILENAME_EXTENSION;
@@ -74,15 +73,11 @@ impl DataDirectory {
             .context("open_ensure_parent_dir_exists")
     }
 
-    ///////////////////////////////////////////////////////////////////////////
-    ///
     /// The root data directory path
     pub fn root_dir_path(&self) -> PathBuf {
         self.data_dir.clone()
     }
 
-    ///////////////////////////////////////////////////////////////////////////
-    ///
     /// The block database directory path
     pub fn database_dir_path(&self) -> PathBuf {
         self.data_dir.join(Path::new(DATABASE_DIRECTORY_ROOT_NAME))
@@ -92,8 +87,6 @@ impl DataDirectory {
         self.data_dir.join(Path::new(NETWORK_SUBDIRECTORY_NAME))
     }
 
-    ///////////////////////////////////////////////////////////////////////////
-    ///
     /// The banned IPs database directory path.
     ///
     /// This directory lives within `DataDirectory::database_dir_path()`.
@@ -101,15 +94,12 @@ impl DataDirectory {
         self.database_dir_path().join(Path::new(BANNED_IPS_DB_NAME))
     }
 
-    ///////////////////////////////////////////////////////////////////////////
     /// directory for storing database backups before migrating schema to newer version
     pub fn db_migration_backups_dir_path(&self) -> PathBuf {
         self.database_dir_path()
             .join(Path::new(DB_MIGRATION_BACKUPS_DIR))
     }
 
-    ///////////////////////////////////////////////////////////////////////////
-    ///
     /// The mutator set database directory path.
     ///
     /// This directory lives within `DataDirectory::database_dir_path()`.
@@ -118,8 +108,6 @@ impl DataDirectory {
             .join(Path::new(MUTATOR_SET_DIRECTORY_NAME))
     }
 
-    ///////////////////////////////////////////////////////////////////////////
-    ///
     /// The archival block MMR database directory path
     ///
     /// This directory lives within `DataDirectory::database_dir_path()`.
@@ -128,18 +116,6 @@ impl DataDirectory {
             .join(Path::new(ARCHIVAL_BLOCK_MMR_DIRECTORY_NAME))
     }
 
-    ///////////////////////////////////////////////////////////////////////////
-    ///
-    /// The UTXO index database directory path
-    ///
-    /// This directory lives within `DataDirectory::database_dir_path()`.
-    pub(crate) fn utxo_index_dir_path(&self) -> PathBuf {
-        self.database_dir_path()
-            .join(Path::new(UTXO_INDEX_DIRECTORY_NAME))
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
-    ///
     /// The block body directory.
     ///
     /// This directory lives within `DataDirectory::root_dir_path()`.

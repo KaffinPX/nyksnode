@@ -82,7 +82,7 @@ impl Transaction {
     /// set hashes are not the same, if both transactions have coinbase a
     /// coinbase UTXO, if either of the transactions are *not* a single
     /// proof, or if the RHS (`other`) has a negative fee.
-    pub async fn merge_with(
+    pub fn merge_with(
         self,
         other: Transaction,
         shuffle_seed: [u8; 32],

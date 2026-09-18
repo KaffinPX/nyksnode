@@ -254,3 +254,13 @@ impl StdHash for Utxo {
         StdHash::hash(&self.encode(), state);
     }
 }
+
+#[cfg(any(test, feature = "test-helpers"))]
+impl Utxo {
+    pub fn empty_dummy() -> Self {
+        Self {
+            lock_script_hash: Digest::default(),
+            coins: vec![],
+        }
+    }
+}

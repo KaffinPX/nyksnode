@@ -1,7 +1,6 @@
 use nyks_consensus::BFieldElement;
 use nyks_consensus::network::Network;
 use nyks_consensus::tasm_lib::prelude::Digest;
-use nyks_consensus::transaction::announcement::Announcement;
 use nyks_consensus::transaction::lock_script::LockScript;
 use serde::Deserialize;
 use serde::Serialize;
@@ -9,7 +8,8 @@ use thiserror::Error;
 
 use crate::wallet::keys::schemes::generation::GenerationAddress;
 use crate::wallet::keys::schemes::symmetric::SymmetricAddress;
-use crate::wallet::notes::utxo_notification::UtxoNotificationPayload;
+use crate::wallet::notes::content::NoteContent;
+use crate::wallet::notes::note::Note;
 
 #[derive(Debug, Error)]
 pub enum Bech32mDecodeError {
@@ -54,27 +54,8 @@ pub trait Recipient: Sync {
     /// the transaction.
     fn lock_script(&self) -> LockScript;
 
-    /// Generates an [Announcement] for a UTXO notification.
-    ///
-    /// The announcement typically contains:
-    ///
-    /// - type flag
-    /// - receiver identifier
-    /// - encrypted payload
-    ///
-    /// These fields allow the receiver to determine whether decryption should
-    /// be attempted.
-    fn create_note_announcement(
-        &self,
-        utxo_notification_payload: &UtxoNotificationPayload,
-    ) -> Announcement;
-
-    // Generates a redeemable note (the data someone needs to claim and use an UTXO) intended for off-chain use.
-    fn create_note(
-        &self,
-        utxo_notification_payload: &UtxoNotificationPayload,
-        network: Network,
-    ) -> String;
+    /// TODO: comment
+    fn create_private_note(&self, content: &NoteContent) -> Note;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -128,21 +109,10 @@ impl Recipient for Address {
         }
     }
 
-    fn create_note_announcement(&self, payload: &UtxoNotificationPayload) -> Announcement {
+    fn create_private_note(&self, content: &NoteContent) -> Note {
         match self {
-            Address::Generation(a) => a.create_note_announcement(payload),
-            Address::Symmetric(a) => a.create_note_announcement(payload),
-        }
-    }
-
-    fn create_note(
-        &self,
-        utxo_notification_payload: &UtxoNotificationPayload,
-        network: Network,
-    ) -> String {
-        match self {
-            Address::Generation(a) => a.create_note(utxo_notification_payload, network),
-            Address::Symmetric(a) => a.create_note(utxo_notification_payload, network),
+            Address::Generation(a) => a.create_private_note(content),
+            Address::Symmetric(a) => a.create_private_note(content),
         }
     }
 }

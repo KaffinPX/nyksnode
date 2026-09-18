@@ -159,7 +159,7 @@ impl BlockTransaction {
     /// See also: [`Transaction::merge_with`], which should be used if
     ///  - a) the arguments are two regular [`Transaction`]s; and
     ///  - b) the result must be a regular [`Transaction`] as well.
-    pub async fn merge(
+    pub fn merge(
         coinbase: BlockOrRegularTransaction,
         other: Transaction,
         shuffle_seed: [u8; 32],

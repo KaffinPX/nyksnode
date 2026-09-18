@@ -649,10 +649,6 @@ impl GlobalState {
             .persist()
             .await;
 
-        if let Some(utxo_index) = &mut self.chain.archival_state_mut().utxo_index {
-            utxo_index.persist().await;
-        }
-
         // flush peer_standings
         self.net.peer_databases.peer_standings_by_ip.flush().await;
 
