@@ -8,21 +8,31 @@ use thiserror::Error;
 
 use super::super::shared::CHUNK_SIZE;
 
-/// "Hard" max on the number of elements in a packed [`Chunk`].
-/// Based on the Chernoff bound, the probability of finding a [`Chunk`] with
-/// 4096 elements or more is less than 2^{-4000}. So without loss of generality,
-/// a [`Chunk`] will never have 4096 elements. Packing a [`Chunk`] can therefore
-/// result in (4095+1) * 12 / 32 = 1536 u32s.
-///                           '--- u32 width
-///                       '------- width of packed element and length indicator
-///                 '------------- length indicator
-///              '---------------- max # elements
-const MAX_PACKED_LENGTH: usize = 1536;
-const MAX_UNPACKED_LENGTH: usize = 4095;
+/// *Hard* max on the number of `u32` elements in a packed [`Chunk`].
+///
+/// 256 batches can touch a chunk. Each batch has 8 UTXOs. And the removal of
+/// each UTXO sets 45 indices. So a maximum of 92,160 elements can
+/// (with a Tip5 preimage attack) be set in a chunk.
+///
+/// (256 * 8 * 45 + 2) * 12 / 32 = 34561 (rounded up)
+///  |     |   |    |    |    '---- u32 width
+///  |     |   |    |    '--------- width of packed element and length indicator
+///  |     |   |    '-------------- two u12 values for the length indicator
+///  |     |   '------------------- num set indices per removed element
+///  |     '----------------------- UTXOs per batch
+///  '----------------------------- num batches that can touch one specific chunk
+const MAX_PACKED_LENGTH: usize = 34561;
+const MAX_UNPACKED_LENGTH: usize = 92160;
+
+/// The 12th bit of the first `u12` of a packed [`Chunk`]. It is set iff the
+/// next `u12` is also part of the length indicator. See [`Chunk::pack`].
+const LONG_LENGTH_FLAG: u32 = 1 << 11;
 
 #[derive(Debug, Clone, Copy, Error, PartialEq, Eq)]
-pub enum ChunkUnpackError {
-    #[error("payload is too large -- packed chunk can never be more than {MAX_PACKED_LENGTH} u32s")]
+pub(crate) enum ChunkUnpackError {
+    #[error(
+        "payload is too large -- packed chunk can never be more than {MAX_PACKED_LENGTH} u32s"
+    )]
     PayloadTooBig,
 
     #[error("actual length is inconsistent relative to length indicator")]
@@ -30,6 +40,15 @@ pub enum ChunkUnpackError {
 
     #[error("remainder bits were not zero")]
     NonzeroTrailingPadding,
+
+    #[error("the empty chunk packs to the empty list, not to a zero length indicator")]
+    NonCanonicalEmptyChunk,
+
+    #[error(
+        "length indicator uses the long form for a length below {LONG_LENGTH_FLAG}, which fits \
+         the short form"
+    )]
+    NonMinimalLengthIndicator,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, GetSize, BFieldCodec, TasmObject)]
@@ -56,6 +75,21 @@ impl Chunk {
             index
         );
         self.relative_indices.push(index);
+        self.relative_indices.sort();
+    }
+
+    /// Insert a batch of indices. Equivalent to calling [`Self::insert`] for
+    /// each of them, but sorts only once.
+    pub fn insert_many(&mut self, indices: &[u32]) {
+        for index in indices {
+            assert!(
+                *index < CHUNK_SIZE,
+                "index cannot exceed chunk size in `insert`. CHUNK_SIZE = {}, got index = {}",
+                CHUNK_SIZE,
+                index
+            );
+        }
+        self.relative_indices.extend_from_slice(indices);
         self.relative_indices.sort();
     }
 
@@ -138,10 +172,29 @@ impl Chunk {
     }
 
     /// Compresses a [`Chunk`] by encoding:
-    ///  - the length of the vector of relative indices as a u12
-    ///  - every element as a u12
+    ///  - the length of the vector of relative indices as a length indicator of
+    ///    either one or two u12 elements, see below,
+    ///  - every element as a u12,
     ///  - the resulting bitvec as `Vec<u32>`.
-    pub fn pack(&self) -> Chunk {
+    ///
+    /// The length indicator spends one u12 for lengths below 2^11, storing the
+    /// length verbatim. Chunks with more indices than this, set the 12th bit of
+    /// the first u12 as a flag, and the next u12 is then also part of the
+    /// length indicator:
+    ///
+    /// Lengths 2^11 and above are encoded as:
+    ///
+    /// ```notest
+    ///  <--- u12 ---> <--- u12 --->
+    /// ┌─┬───────────┬─────────────┐
+    /// │1│ length hi │  length lo  │
+    /// └─┴───────────┴─────────────┘
+    ///  '--- flag
+    /// ```
+    ///
+    /// That leaves 11 + 12 = 23 bits for the length, which is much more than
+    /// [`MAX_UNPACKED_LENGTH`].
+    pub(crate) fn pack(&self) -> Chunk {
         if self.relative_indices.is_empty() {
             return Self {
                 relative_indices: vec![],
@@ -156,13 +209,26 @@ impl Chunk {
             "Unpacked length of a chunk may not exceed {MAX_UNPACKED_LENGTH}"
         );
 
+        let num_elements = self.relative_indices.len() as u32;
+        let length_encoding = if num_elements < LONG_LENGTH_FLAG {
+            vec![num_elements]
+        } else {
+            let length_hi = (num_elements >> 12) | LONG_LENGTH_FLAG;
+            let length_lo = num_elements & ((1 << 12) - 1);
+            vec![length_hi, length_lo]
+        };
+
+        self.pack_with_length_encoding(&length_encoding)
+    }
+
+    /// The bit-packing half of [`Self::pack`], with the length indicator
+    /// supplied by the caller.
+    fn pack_with_length_encoding(&self, length_encoding: &[u32]) -> Chunk {
         let mut packed = vec![];
         let mut width = 0_usize;
         let mut current = 0_u64;
-        for &element in [self.relative_indices.len() as u32]
-            .iter()
-            .chain(&self.relative_indices)
-        {
+
+        for &element in length_encoding.iter().chain(&self.relative_indices) {
             width += 12;
             current = (current << 12) | u64::from(element);
 
@@ -190,7 +256,7 @@ impl Chunk {
     }
 
     /// Inverse of [`Self::pack`].
-    pub fn try_unpack(&self) -> Result<Self, ChunkUnpackError> {
+    pub(crate) fn try_unpack(&self) -> Result<Self, ChunkUnpackError> {
         if self.relative_indices.is_empty() {
             return Ok(Self {
                 relative_indices: vec![],
@@ -205,15 +271,33 @@ impl Chunk {
 
         let mut current = 0_u64;
         let mut width = 0_usize;
-        let indicated_length = (self.relative_indices[0] >> 20) & ((1 << 12) - 1);
+
+        // The first u12 is the length, unless its 12th bit is set, in which
+        // case the length spans the first two u12s. See [`Self::pack`].
+        let first_length_element = (self.relative_indices[0] >> 20) & ((1 << 12) - 1);
+        let (indicated_length, num_length_elements) = if first_length_element < LONG_LENGTH_FLAG {
+            (first_length_element, 1)
+        } else {
+            let length_hi = first_length_element & (LONG_LENGTH_FLAG - 1);
+            let length_lo = (self.relative_indices[0] >> 8) & ((1 << 12) - 1);
+            ((length_hi << 12) | length_lo, 2)
+        };
+
+        // The length indicator must be the one `pack` would have produced.
+        if indicated_length == 0 {
+            return Err(ChunkUnpackError::NonCanonicalEmptyChunk);
+        }
+        if num_length_elements == 2 && indicated_length < LONG_LENGTH_FLAG {
+            return Err(ChunkUnpackError::NonMinimalLengthIndicator);
+        }
 
         #[expect(clippy::manual_div_ceil, reason = "approach tasm implementation")]
-        let indicated_packed_length = ((indicated_length + 1) * 12 + 31) / 32;
+        let indicated_packed_length = ((indicated_length + num_length_elements) * 12 + 31) / 32;
         if indicated_packed_length != u32::try_from(self.relative_indices.len()).unwrap() {
             return Err(ChunkUnpackError::InconsistentLength);
         }
 
-        let mut remaining_elements = indicated_length + 1;
+        let mut remaining_elements = indicated_length + num_length_elements;
         // Invariant: number of elements left to iterate over is
         // N == (remaining_elements * 12 - width + 31) / 32.
         //
@@ -221,7 +305,7 @@ impl Chunk {
         // N == self.relative_indices.len()
         //   == indicated_packed_length
         //               (as per above if-statement)
-        //   == ((indicated_length + 1) * 12 + 31) / 32
+        //   == ((indicated_length + num_length_elements) * 12 + 31) / 32
         //               (by assignment above that)
         //   == (remaining_elements * 12 + 31) / 32
         //               (by assignment to remaining_elements)
@@ -281,7 +365,7 @@ impl Chunk {
         // From width in [0;12) it follows that remaining_elements == 0.
         // So it is not necessary check that remaining_elements == 0.
 
-        let total_bit_length = (indicated_length + 1) * 12;
+        let total_bit_length = (indicated_length + num_length_elements) * 12;
         let num_non_padding_bits_in_last_element = total_bit_length % 32;
         let tail_length = if num_non_padding_bits_in_last_element != 0 {
             32 - num_non_padding_bits_in_last_element
@@ -295,7 +379,7 @@ impl Chunk {
         }
 
         Ok(Self {
-            relative_indices: unpacked[1..].to_vec(),
+            relative_indices: unpacked[num_length_elements as usize..].to_vec(),
         })
     }
 }
