@@ -1,6 +1,5 @@
-pub mod core;
-mod dashboard;
-mod setup;
+mod core;
+mod tui;
 
 use std::panic;
 
@@ -11,7 +10,7 @@ use nyks_rpc_client::http::HttpClient;
 use nyks_wallet_core::entropy::wallet_entropy::WalletEntropy;
 use nyks_wallet_sdk::wallet::Wallet;
 
-use crate::core::storage::Storage;
+use crate::{core::storage::Storage, tui::{dashboard, setup}};
 
 #[derive(Parser)]
 #[command(name = "nyks-wallet")]
@@ -37,14 +36,13 @@ async fn main() -> Result<()> {
     let default_hook = panic::take_hook();
     panic::set_hook(Box::new(move |panic_info| {
         // Always leave the terminal usable, even if we panic mid-draw.
-        core::tui::restore();
+        tui::restore();
         default_hook(panic_info);
         std::process::exit(1);
     }));
 
     let rpc = HttpClient::new(args.rpc_url);
     let storage = Storage::new(args.wallet_dir);
-
     let entropy = match storage.keys.get_mnemonic() {
         Some(mnemonic) => {
             let words: Vec<String> = mnemonic.split_whitespace().map(str::to_owned).collect();

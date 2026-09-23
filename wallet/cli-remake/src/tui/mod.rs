@@ -1,3 +1,6 @@
+pub mod dashboard;
+pub mod setup;
+
 /// Terminal handle shared by every screen in this module.
 pub type Tui = ratatui::DefaultTerminal;
 

@@ -30,7 +30,7 @@ use address::AddressPage;
 use send::SendPage;
 use snapshot::Snapshot;
 
-use crate::core::tui;
+use crate::tui;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Tab {

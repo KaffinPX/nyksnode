@@ -18,7 +18,7 @@ use import::ImportPage;
 use menu::MenuPage;
 
 use crate::core::storage::Storage;
-use crate::core::tui;
+use crate::tui;
 
 enum Screen {
     Menu(MenuPage),
