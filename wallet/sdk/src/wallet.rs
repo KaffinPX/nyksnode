@@ -17,9 +17,11 @@ use nyks_standards::wallet::keys::key::Spender;
 use nyks_wallet_core::entropy::wallet_entropy::WalletEntropy;
 use nyks_wallet_core::transaction::builder::TransactionBuilder;
 use nyks_wallet_core::transaction::builder::output::TxOutput;
+use nyks_wallet_core::transaction::primitive_witness::ProvingStage;
 use nyks_wallet_core::transaction::utxo::spendable::SpendableUtxo;
 use thiserror::Error;
 use tokio::sync::RwLock;
+use tokio::sync::mpsc::UnboundedSender;
 
 use crate::scanners::chain::AdvanceError;
 use crate::scanners::chain::ChainScanner;
@@ -302,20 +304,23 @@ impl Wallet {
 
     /// Builds, signs and submits a transaction sending `amount` to `recipient`.
     ///
-    /// Returns the submitted transaction's kernel id. Any `UtxoInvalidated`
-    /// events raised while selecting inputs (UTXOs found spent during
-    /// proof-syncing) are queued and surfaced on the next call to
-    /// [`Wallet::sync`], rather than returned here directly.
+    /// If `progress` is `Some`, a [`ProvingStage`] is sent as each
+    /// proof-proving stage begins; the channel closes on its own once
+    /// proving completes. Pass `None` to skip progress reporting.
+    ///
+    /// Any `UtxoInvalidated` events raised while selecting inputs (UTXOs
+    /// found spent during proof-syncing) are queued and surfaced on the
+    /// next call to [`Wallet::sync`], rather than returned here directly.
     pub async fn send(
         &self,
         recipient: Address,
         amount: NativeCurrencyAmount,
         fee: NativeCurrencyAmount,
+        progress: Option<UnboundedSender<ProvingStage>>,
     ) -> Result<TransactionKernelId, RpcError> {
         let height = self.tip_height().await;
         let timestamp = Timestamp::now();
 
-        // Generate "spendable" UTXOs and prepare them for spending.
         let mut utxos = self.utxos.write().await;
         let excluded_utxos = self
             .mempool_scanner
@@ -340,7 +345,6 @@ impl Wallet {
 
         let inputs = self.unlock_utxos(selection.utxos).await;
 
-        // Generate change address and randomnesses for outputs.
         let change_address = self.address(KeyType::Symmetric).await; // TODO: increment symmetric address count
         let (sender_randomness, change_sender_randomness) = {
             let addresses = self.addresses.read().await;
@@ -370,7 +374,19 @@ impl Wallet {
             .mutator_set_accumulator(selection.msa)
             .build()
             .unwrap();
-        let transaction = transaction.upgrade();
+
+        // Proving is CPU-heavy; do it off the async executor and stream
+        // stage updates back through `progress`, if supplied.
+        let transaction = tokio::task::spawn_blocking(move || {
+            transaction.upgrade_with_progress(move |stage| {
+                if let Some(tx) = &progress {
+                    let _ = tx.send(stage);
+                }
+            })
+        })
+        .await
+        .expect("spawned task for proving transaction should not panic");
+
         let transaction: Transaction = transaction.try_into().unwrap();
         let transaction_kernel_id = transaction.txid();
 
