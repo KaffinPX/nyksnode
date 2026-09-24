@@ -64,9 +64,6 @@ impl Tab {
     }
 }
 
-/// Runs the main dashboard: tabs for balance, address, and send. Takes over
-/// the terminal until the user quits (`q` / `Esc` outside the Send form, or
-/// `Ctrl-C` anywhere).
 pub async fn run(wallet: Wallet) -> Result<()> {
     let mut terminal = tui::init();
     let result = run_loop(&mut terminal, wallet).await;
@@ -77,8 +74,6 @@ pub async fn run(wallet: Wallet) -> Result<()> {
 async fn run_loop(terminal: &mut tui::Tui, wallet: Wallet) -> Result<()> {
     let (tx, mut rx) = mpsc::unbounded_channel::<Event>();
 
-    // crossterm's `event::read` is a blocking OS call, so it gets its own
-    // thread; parsed events are forwarded to the async loop below.
     std::thread::spawn(move || {
         while let Ok(ev) = event::read() {
             if tx.send(ev).is_err() {
@@ -92,24 +87,32 @@ async fn run_loop(terminal: &mut tui::Tui, wallet: Wallet) -> Result<()> {
     let mut send_page = SendPage::default();
     let mut snapshot = Snapshot::fetch(&wallet).await;
     let mut refresh = tokio::time::interval(Duration::from_secs(5));
-    refresh.tick().await; // first tick fires immediately; we already have a snapshot.
+    refresh.tick().await;
 
     terminal.draw(|frame| draw(frame, tab, &address_page, &send_page, &snapshot))?;
 
     loop {
+        // No-op branch when no send is running.
+        let send_update = async {
+            if send_page.is_active() {
+                send_page.await_result().await
+            } else {
+                std::future::pending().await
+            }
+        };
+
         tokio::select! {
             _ = refresh.tick() => {
                 snapshot = Snapshot::fetch(&wallet).await;
+                terminal.draw(|frame| draw(frame, tab, &address_page, &send_page, &snapshot))?;
+            }
+            _ = send_update => {
                 terminal.draw(|frame| draw(frame, tab, &address_page, &send_page, &snapshot))?;
             }
             maybe_event = rx.recv() => {
                 let Some(event) = maybe_event else { break };
 
                 match event {
-                    // `Terminal::draw` re-queries the backend's size and
-                    // adjusts its buffers before painting, so redrawing here
-                    // is all a resize needs — but it only happens if we
-                    // actually redraw on this event instead of dropping it.
                     Event::Resize(_, _) => {
                         terminal.draw(|frame| draw(frame, tab, &address_page, &send_page, &snapshot))?;
                     }
@@ -119,14 +122,14 @@ async fn run_loop(terminal: &mut tui::Tui, wallet: Wallet) -> Result<()> {
                         }
 
                         match key.code {
-                            // Arrow keys always switch tabs, on every tab.
-                            KeyCode::Left => tab = tab.prev(),
-                            KeyCode::Right => tab = tab.next(),
+                            // Block tab switching while a send is proving.
+                            KeyCode::Left if !send_page.is_active() => tab = tab.prev(),
+                            KeyCode::Right if !send_page.is_active() => tab = tab.next(),
                             // While on Send, everything else belongs to the form.
                             _ if tab == Tab::Send => send_page.handle_key(key.code, &wallet).await,
                             KeyCode::Char('q') | KeyCode::Esc => break,
-                            KeyCode::Tab | KeyCode::Char('l') => tab = tab.next(),
-                            KeyCode::BackTab | KeyCode::Char('h') => tab = tab.prev(),
+                            KeyCode::Tab | KeyCode::Char('l') if !send_page.is_active() => tab = tab.next(),
+                            KeyCode::BackTab | KeyCode::Char('h') if !send_page.is_active() => tab = tab.prev(),
                             KeyCode::Char('r') => snapshot = Snapshot::fetch(&wallet).await,
                             // Anything else is the active tab's business (e.g. ↑/↓ or c on Address).
                             code if tab == Tab::Address => address_page.handle_key(code, &snapshot),
@@ -135,7 +138,6 @@ async fn run_loop(terminal: &mut tui::Tui, wallet: Wallet) -> Result<()> {
 
                         terminal.draw(|frame| draw(frame, tab, &address_page, &send_page, &snapshot))?;
                     }
-                    // Key-release events (Windows) and mouse/focus/paste events are ignored.
                     _ => {}
                 }
             }
@@ -188,6 +190,7 @@ fn draw(
         Tab::Address => {
             "Tab/←→ switch tabs · ↑/↓ choose address type · c copy · r refresh · q quit"
         }
+        Tab::Send if send_page.is_active() => "Sending… please wait · Ctrl-C quit",
         Tab::Send => {
             "←/→ switch tabs · Tab/↓ next field · Enter confirm · Esc clear/back · Ctrl-C quit"
         }

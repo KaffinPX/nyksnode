@@ -169,7 +169,7 @@ pub async fn start_console(wallet: Wallet) {
                     amount, fee
                 );
 
-                match wallet.send(recipient, amount, fee).await {
+                match wallet.send(recipient, amount, fee, None).await {
                     Ok(id) => info!("Announced {} successfully.", id),
                     Err(err) => error!("Failed to submit transaction: {}.", err),
                 };

@@ -10,7 +10,9 @@ use nyks_rpc_client::http::HttpClient;
 use nyks_wallet_core::entropy::wallet_entropy::WalletEntropy;
 use nyks_wallet_sdk::wallet::Wallet;
 
-use crate::{core::storage::Storage, tui::{dashboard, setup}};
+use crate::core::storage::Storage;
+use crate::tui::dashboard;
+use crate::tui::setup;
 
 #[derive(Parser)]
 #[command(name = "nyks-wallet")]

@@ -17,7 +17,7 @@ use nyks_standards::wallet::keys::key::Spender;
 use nyks_wallet_core::entropy::wallet_entropy::WalletEntropy;
 use nyks_wallet_core::transaction::builder::TransactionBuilder;
 use nyks_wallet_core::transaction::builder::output::TxOutput;
-use nyks_wallet_core::transaction::primitive_witness::ProvingStage;
+pub use nyks_wallet_core::transaction::primitive_witness::ProvingStage;
 use nyks_wallet_core::transaction::utxo::spendable::SpendableUtxo;
 use thiserror::Error;
 use tokio::sync::RwLock;

@@ -17,8 +17,8 @@ use ratatui::widgets::Block;
 use ratatui::widgets::Borders;
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::Wrap;
+use tokio::sync::oneshot;
 
-/// The three fields of the send form, in tab order.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Field {
     Recipient,
@@ -59,7 +59,6 @@ impl Field {
     }
 }
 
-/// Raw text currently typed into each field.
 #[derive(Default)]
 struct FormInputs {
     recipient: String,
@@ -108,17 +107,21 @@ fn parse_form(inputs: &FormInputs, network: Network) -> Result<Step, String> {
 }
 
 enum Step {
-    /// Editing one of the three fields.
-    Form { field: Field, error: Option<String> },
-    /// All three fields parsed; asking the user to confirm before it's sent.
+    Form {
+        field: Field,
+        error: Option<String>,
+    },
     Confirm {
         recipient: Address,
         recipient_display: String,
         amount: NativeCurrencyAmount,
         fee: NativeCurrencyAmount,
     },
-    /// `wallet.send` finished; showing the outcome until the next key.
-    Result { ok: bool, message: String },
+    Proving,
+    Result {
+        ok: bool,
+        message: String,
+    },
 }
 
 impl Default for Step {
@@ -130,22 +133,19 @@ impl Default for Step {
     }
 }
 
-/// State for the Send tab.
 #[derive(Default)]
 pub struct SendPage {
     inputs: FormInputs,
     step: Step,
+    result_rx: Option<oneshot::Receiver<(bool, String)>>,
 }
 
 impl SendPage {
-    /// Handles a key press while the Send tab has focus. Takes near-total
-    /// control of the keyboard (see the dispatch in `dashboard::mod`) since
-    /// almost any letter is valid inside a recipient address.
+    pub fn is_active(&self) -> bool {
+        self.result_rx.is_some()
+    }
+
     pub async fn handle_key(&mut self, code: KeyCode, wallet: &Wallet) {
-        // Take the current step out (leaving a placeholder), decide the next
-        // step from an owned value, then write it back. This sidesteps
-        // borrow-checker issues that come from computing the next `Step`
-        // while still holding a reference into the old one.
         let step = std::mem::take(&mut self.step);
 
         self.step = match step {
@@ -192,24 +192,25 @@ impl SendPage {
                 KeyCode::Enter => {
                     let amount_display = amount.to_string();
                     let fee_display = fee.to_string();
-                    match wallet.send(recipient, amount, fee).await {
-                        Ok(id) => {
-                            self.inputs = FormInputs::default();
-                            Step::Result {
-                                ok: true,
-                                message: format!(
+                    let (result_tx, result_rx) = oneshot::channel();
+                    let wallet = wallet.clone();
+
+                    tokio::spawn(async move {
+                        let outcome = match wallet.send(recipient, amount, fee, None).await {
+                            Ok(id) => (
+                                true,
+                                format!(
                                     "Sent {amount_display} NYKS (+ {fee_display} fee) to \
                                      {recipient_display}. Transaction {id} announced."
                                 ),
-                            }
-                        }
-                        // Inputs are deliberately left in place here (unlike
-                        // the success path) so a failed send can just be retried.
-                        Err(e) => Step::Result {
-                            ok: false,
-                            message: format!("Failed to submit transaction: {e}."),
-                        },
-                    }
+                            ),
+                            Err(e) => (false, format!("Failed to submit transaction: {e}.")),
+                        };
+                        let _ = result_tx.send(outcome);
+                    });
+
+                    self.result_rx = Some(result_rx);
+                    Step::Proving
                 }
                 KeyCode::Esc => Step::Form {
                     field: Field::Fee,
@@ -222,11 +223,30 @@ impl SendPage {
                     fee,
                 },
             },
+            // Ignore all input while proving.
+            Step::Proving => Step::Proving,
             Step::Result { .. } => Step::Form {
                 field: Field::Recipient,
                 error: None,
             },
         };
+    }
+
+    /// Only call while `is_active()`.
+    pub async fn await_result(&mut self) {
+        let Some(rx) = self.result_rx.as_mut() else {
+            return;
+        };
+        let outcome = rx.await;
+        self.result_rx = None;
+
+        let (ok, message) =
+            outcome.unwrap_or_else(|_| (false, "Send task ended unexpectedly.".to_owned()));
+
+        if ok {
+            self.inputs = FormInputs::default();
+        }
+        self.step = Step::Result { ok, message };
     }
 
     pub fn draw(&self, frame: &mut Frame, area: Rect) {
@@ -240,6 +260,7 @@ impl SendPage {
                 fee,
                 ..
             } => draw_confirm(frame, area, recipient_display, amount, fee),
+            Step::Proving => draw_proving(frame, area),
             Step::Result { ok, message } => draw_result(frame, area, *ok, message),
         }
     }
@@ -331,6 +352,21 @@ fn draw_confirm(
                     .borders(Borders::ALL)
                     .title(" Confirm send "),
             )
+            .wrap(Wrap { trim: true }),
+        area,
+    );
+}
+
+fn draw_proving(frame: &mut Frame, area: Rect) {
+    let lines = vec![
+        Line::from(Span::styled("Proving…", Style::default().fg(Color::Yellow))),
+        Line::from(""),
+        Line::from("This can take a while. Please wait."),
+    ];
+
+    frame.render_widget(
+        Paragraph::new(lines)
+            .block(Block::default().borders(Borders::ALL).title(" Sending… "))
             .wrap(Wrap { trim: true }),
         area,
     );
