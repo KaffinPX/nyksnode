@@ -359,7 +359,10 @@ fn draw_confirm(
 
 fn draw_proving(frame: &mut Frame, area: Rect) {
     let lines = vec![
-        Line::from(Span::styled("Proving transaction...", Style::default().fg(Color::Magenta))),
+        Line::from(Span::styled(
+            "Proving transaction...",
+            Style::default().fg(Color::Magenta),
+        )),
         Line::from(""),
         Line::from("This can take a while. Please wait."),
     ];

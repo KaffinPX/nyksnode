@@ -18,7 +18,6 @@ members = [
     "wallet/core",
     "wallet/sdk",
     "wallet/cli",
-    "wallet/cli-remake",
     "wasm",
 ]
 

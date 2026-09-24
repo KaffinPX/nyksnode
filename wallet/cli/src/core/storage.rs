@@ -22,7 +22,7 @@ use serde::Serialize;
 /// Write `contents` to `path` atomically via a `.tmp` sibling + `rename`.
 ///
 /// Readers always see either the previous complete file or the new complete
-/// file — never a partial write. `sync_all` ensures bytes reach the device
+/// file, never a partial write. `sync_all` ensures bytes reach the device
 /// before the rename commits, guarding against crash-after-rename data loss.
 fn atomic_write(path: &Path, contents: &[u8]) {
     let tmp = path.with_extension("tmp");
