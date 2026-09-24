@@ -359,14 +359,14 @@ fn draw_confirm(
 
 fn draw_proving(frame: &mut Frame, area: Rect) {
     let lines = vec![
-        Line::from(Span::styled("Proving…", Style::default().fg(Color::Yellow))),
+        Line::from(Span::styled("Proving transaction...", Style::default().fg(Color::Magenta))),
         Line::from(""),
         Line::from("This can take a while. Please wait."),
     ];
 
     frame.render_widget(
         Paragraph::new(lines)
-            .block(Block::default().borders(Borders::ALL).title(" Sending… "))
+            .block(Block::default().borders(Borders::ALL).title(" Sending... "))
             .wrap(Wrap { trim: true }),
         area,
     );

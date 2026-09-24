@@ -190,7 +190,7 @@ fn draw(
         Tab::Address => {
             "Tab/←→ switch tabs · ↑/↓ choose address type · c copy · r refresh · q quit"
         }
-        Tab::Send if send_page.is_active() => "Sending… please wait · Ctrl-C quit",
+        Tab::Send if send_page.is_active() => "Sending... please wait · Ctrl-C quit",
         Tab::Send => {
             "←/→ switch tabs · Tab/↓ next field · Enter confirm · Esc clear/back · Ctrl-C quit"
         }
