@@ -266,7 +266,10 @@ mod tests {
         assert_eq!(*PublicNote::decode(&encoded).unwrap(), note);
         assert_eq!(PublicNote::static_length(), None);
 
-        assert!(matches!(PublicNote::decode(&[]).unwrap_err(), PublicNoteError::TooShort));
+        assert!(matches!(
+            PublicNote::decode(&[]).unwrap_err(),
+            PublicNoteError::TooShort
+        ));
         assert!(matches!(
             PublicNote::decode(&[BFieldElement::new(TAG_PRIVATE), BFieldElement::new(1)]).unwrap_err(),
             PublicNoteError::WrongTag(t) if t == TAG_PRIVATE
@@ -274,8 +277,12 @@ mod tests {
 
         // 99 isn't a valid NoteContent discriminant, so this exercises the
         // #[from] NoteContentError -> PublicNoteError::Content conversion.
-        let err = PublicNote::decode(&[BFieldElement::new(TAG_PUBLIC), BFieldElement::new(1), BFieldElement::new(99)])
-            .unwrap_err();
+        let err = PublicNote::decode(&[
+            BFieldElement::new(TAG_PUBLIC),
+            BFieldElement::new(1),
+            BFieldElement::new(99),
+        ])
+        .unwrap_err();
         assert!(matches!(err, PublicNoteError::Content(_)));
     }
 
@@ -287,7 +294,10 @@ mod tests {
         assert_eq!(*PrivateNote::decode(&encoded).unwrap(), note);
         assert_eq!(PrivateNote::static_length(), None);
 
-        assert!(matches!(PrivateNote::decode(&[BFieldElement::new(TAG_PRIVATE)]).unwrap_err(), PrivateNoteError::TooShort));
+        assert!(matches!(
+            PrivateNote::decode(&[BFieldElement::new(TAG_PRIVATE)]).unwrap_err(),
+            PrivateNoteError::TooShort
+        ));
         assert!(matches!(
             PrivateNote::decode(&[BFieldElement::new(TAG_PUBLIC), BFieldElement::new(1)]).unwrap_err(),
             PrivateNoteError::WrongTag(t) if t == TAG_PUBLIC
@@ -315,7 +325,10 @@ mod tests {
     #[test]
     fn note_decode_errors() {
         assert!(matches!(Note::decode(&[]).unwrap_err(), NoteError::Empty));
-        assert!(matches!(Note::decode(&[BFieldElement::new(2)]).unwrap_err(), NoteError::UnknownTag(2)));
+        assert!(matches!(
+            Note::decode(&[BFieldElement::new(2)]).unwrap_err(),
+            NoteError::UnknownTag(2)
+        ));
         // Tag alone, no receiver id: inner decode fails and propagates via #[from].
         assert!(matches!(
             Note::decode(&[BFieldElement::new(TAG_PUBLIC)]).unwrap_err(),
@@ -339,11 +352,13 @@ mod tests {
         let hrp = format!("note{}", network_hrp_char(Network::Main));
 
         // Right HRP, wrong bech32 variant -> fails the variant check.
-        let wrong_variant = bech32::encode(&hrp, bytes.to_base32(), bech32::Variant::Bech32).unwrap();
+        let wrong_variant =
+            bech32::encode(&hrp, bytes.to_base32(), bech32::Variant::Bech32).unwrap();
         assert!(Note::from_bech32m(&wrong_variant, Network::Main).is_err());
 
         // Right variant, wrong HRP -> fails the network check.
-        let wrong_hrp = bech32::encode("wrong", bytes.to_base32(), bech32::Variant::Bech32m).unwrap();
+        let wrong_hrp =
+            bech32::encode("wrong", bytes.to_base32(), bech32::Variant::Bech32m).unwrap();
         assert!(Note::from_bech32m(&wrong_hrp, Network::Main).is_err());
     }
 }

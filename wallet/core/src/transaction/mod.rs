@@ -6,6 +6,7 @@ use nyks_consensus::transaction::validity::proof_collection::ProofCollection;
 use thiserror::Error;
 
 use crate::transaction::primitive_witness::PrimitiveWitness;
+use crate::transaction::primitive_witness::ProvingStage;
 
 pub mod builder;
 pub mod primitive_witness;
@@ -52,13 +53,18 @@ pub struct BuilderTransaction {
 }
 
 impl BuilderTransaction {
-    /// Upgrades the transaction proof to a level that can be broadcasted.
+    /// Upgrades the transaction proof to minimum level that can be broadcasted.
     pub fn upgrade(self) -> Self {
+        self.upgrade_with_progress(|_| {})
+    }
+
+    /// Like [`Self::upgrade`], but calls `on_progress` as each proving stage
+    /// begins.
+    pub fn upgrade_with_progress(self, on_progress: impl FnMut(ProvingStage)) -> Self {
         let new_proof = match self.proof {
-            BuilderTransactionProof::Witness(witness) => {
-                BuilderTransactionProof::ProofCollection(witness.prove().unwrap())
-            }
-            // Other types are not supported yet, still investigating DX and use cases...
+            BuilderTransactionProof::Witness(witness) => BuilderTransactionProof::ProofCollection(
+                witness.prove_with_progress(on_progress).unwrap(),
+            ),
             _ => unimplemented!(),
         };
 

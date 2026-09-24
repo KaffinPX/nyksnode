@@ -8,6 +8,7 @@ use nyks_consensus::twenty_first::prelude::Polynomial;
 use nyks_consensus::twenty_first::xfe;
 use rand::Rng;
 use rand::SeedableRng;
+use rand::rng;
 use rand::rngs::StdRng;
 use thiserror::Error;
 use zeroize::Zeroize;
@@ -164,6 +165,12 @@ impl SecretKeyMaterial {
 
         let p0 = polynomial.evaluate(XFieldElement::ZERO);
         Ok(SecretKeyMaterial(p0))
+    }
+
+    /// Generate fresh random secret key material using the operating system's
+    /// cryptographically secure random number generator.
+    pub fn random() -> Self {
+        Self(rng().random())
     }
 
     /// Convert a seed phrase into [`SecretKeyMaterial`].
