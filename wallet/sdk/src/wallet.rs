@@ -15,6 +15,7 @@ use nyks_standards::wallet::keys::address::Recipient;
 use nyks_standards::wallet::keys::key::KeyType;
 use nyks_standards::wallet::keys::key::Spender;
 use nyks_wallet_core::entropy::wallet_entropy::WalletEntropy;
+use nyks_wallet_core::transaction::BuilderTransaction;
 use nyks_wallet_core::transaction::builder::TransactionBuilder;
 use nyks_wallet_core::transaction::builder::output::TxOutput;
 pub use nyks_wallet_core::transaction::primitive_witness::ProvingStage;
@@ -30,6 +31,7 @@ use crate::state::address_book::AddressBook;
 use crate::state::utxos::MonitoredUtxo;
 use crate::state::utxos::UtxoKey;
 use crate::state::utxos::pool::UtxoPool;
+use crate::state::utxos::pool::UtxosSelection;
 
 const BATCH_SIZE: usize = 100;
 
@@ -60,6 +62,9 @@ pub enum WalletEvent {
         id: TransactionKernelId,
         utxos: Vec<UtxoKey>,
     },
+
+    /// A new address was derived by the wallet.
+    AddressGenerated { key_type: KeyType, address: Address },
 }
 
 impl WalletEvent {
@@ -98,10 +103,24 @@ impl Wallet {
         height: Option<BlockHeight>,
         network: Network,
     ) -> Self {
-        let addresses = AddressBook::new(entropy);
+        Self::new_with_address_indexes(rpc, entropy, height, network, 1, 1)
+    }
+
+    /// Creates a wallet that scans every index from 0 through the selected
+    /// index per key type.
+    pub fn new_with_address_indexes(
+        rpc: HttpClient,
+        entropy: WalletEntropy,
+        height: Option<BlockHeight>,
+        network: Network,
+        generation_index: u64,
+        symmetric_index: u64,
+    ) -> Self {
+        let addresses =
+            AddressBook::with_address_indexes(entropy, generation_index, symmetric_index);
         let utxos = UtxoPool::new(rpc.clone());
 
-        let view_keys = addresses.view_keys().to_vec();
+        let view_keys = addresses.viewing_keys().to_vec();
 
         Wallet {
             rpc,
@@ -308,9 +327,8 @@ impl Wallet {
     /// proof-proving stage begins; the channel closes on its own once
     /// proving completes. Pass `None` to skip progress reporting.
     ///
-    /// Any `UtxoInvalidated` events raised while selecting inputs (UTXOs
-    /// found spent during proof-syncing) are queued and surfaced on the
-    /// next call to [`Wallet::sync`], rather than returned here directly.
+    /// Events raised while sending are queued and surfaced on the next call
+    /// to [`Wallet::sync`].
     pub async fn send(
         &self,
         recipient: Address,
@@ -318,10 +336,25 @@ impl Wallet {
         fee: NativeCurrencyAmount,
         progress: Option<UnboundedSender<ProvingStage>>,
     ) -> Result<TransactionKernelId, RpcError> {
-        let height = self.tip_height().await;
         let timestamp = Timestamp::now();
+        let selection = self.select_inputs(amount + fee, timestamp).await;
+        let height = self.tip_height().await;
+        let transaction = self
+            .build_transaction(recipient, amount, fee, timestamp, height, selection)
+            .await;
+        let transaction = Self::prove_transaction(transaction, progress).await;
+        let transaction_kernel_id = transaction.txid();
 
-        let mut utxos = self.utxos.write().await;
+        self.rpc.submit_transaction(transaction.into()).await?;
+
+        Ok(transaction_kernel_id)
+    }
+
+    async fn select_inputs(
+        &self,
+        target: NativeCurrencyAmount,
+        timestamp: Timestamp,
+    ) -> UtxosSelection {
         let excluded_utxos = self
             .mempool_scanner
             .read()
@@ -329,34 +362,53 @@ impl Wallet {
             .pending_spend_utxos()
             .copied()
             .collect();
-        let selection = utxos
-            .select_utxos(amount + fee, timestamp, Some(excluded_utxos))
+        let selection = self
+            .utxos
+            .write()
+            .await
+            .select_utxos(target, timestamp, Some(excluded_utxos))
             .await;
 
         if !selection.invalidated_utxos.is_empty() {
-            let mut pending = self.pending_events.write().await;
-            pending.extend(
+            self.pending_events.write().await.extend(
                 selection
                     .invalidated_utxos
-                    .into_iter()
-                    .map(|(key, utxo)| WalletEvent::utxo_invalidated(key, utxo)),
+                    .iter()
+                    .map(|(key, utxo)| WalletEvent::utxo_invalidated(*key, utxo.clone())),
             );
         }
+        selection
+    }
 
+    async fn build_transaction(
+        &self,
+        recipient: Address,
+        amount: NativeCurrencyAmount,
+        fee: NativeCurrencyAmount,
+        timestamp: Timestamp,
+        height: BlockHeight,
+        selection: UtxosSelection,
+    ) -> BuilderTransaction {
         let inputs = self.unlock_utxos(selection.utxos).await;
+        let change_address = self.next_address(KeyType::Symmetric).await;
+        self.pending_events
+            .write()
+            .await
+            .push(WalletEvent::AddressGenerated {
+                key_type: KeyType::Symmetric,
+                address: change_address.clone(),
+            });
 
-        let change_address = self.address(KeyType::Symmetric).await; // TODO: increment symmetric address count
         let (sender_randomness, change_sender_randomness) = {
             let addresses = self.addresses.read().await;
             let entropy = addresses.entropy();
-
             (
                 entropy.generate_sender_randomness(height, recipient.privacy_digest()),
                 entropy.generate_sender_randomness(height, change_address.privacy_digest()),
             )
         };
 
-        let transaction = TransactionBuilder::new()
+        TransactionBuilder::new()
             .inputs(inputs.into())
             .outputs(
                 vec![
@@ -364,7 +416,7 @@ impl Wallet {
                     TxOutput::onchain_native_currency_as_change(
                         selection.change,
                         change_sender_randomness,
-                        self.address(KeyType::Symmetric).await,
+                        change_address,
                     ),
                 ]
                 .into(),
@@ -373,10 +425,13 @@ impl Wallet {
             .timestamp(timestamp)
             .mutator_set_accumulator(selection.msa)
             .build()
-            .unwrap();
+            .unwrap()
+    }
 
-        // Proving is CPU-heavy; do it off the async executor and stream
-        // stage updates back through `progress`, if supplied.
+    async fn prove_transaction(
+        transaction: BuilderTransaction,
+        progress: Option<UnboundedSender<ProvingStage>>,
+    ) -> Transaction {
         let transaction = tokio::task::spawn_blocking(move || {
             transaction.upgrade_with_progress(move |stage| {
                 if let Some(tx) = &progress {
@@ -386,13 +441,7 @@ impl Wallet {
         })
         .await
         .expect("spawned task for proving transaction should not panic");
-
-        let transaction: Transaction = transaction.try_into().unwrap();
-        let transaction_kernel_id = transaction.txid();
-
-        self.rpc.submit_transaction(transaction.into()).await?;
-
-        Ok(transaction_kernel_id)
+        transaction.try_into().unwrap()
     }
 
     async fn unlock_utxos(&self, utxos: Vec<MonitoredUtxo>) -> Vec<SpendableUtxo> {

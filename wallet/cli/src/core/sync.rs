@@ -54,6 +54,9 @@ pub async fn run(wallet: Wallet, storage: Storage) {
                 WalletEvent::UtxosOutgoing { id, utxos } => {
                     info!("{} UTXOs being spent on transaction {}.", utxos.len(), id);
                 }
+                WalletEvent::AddressGenerated { key_type, address } => {
+                    info!("Generated {key_type:?} wallet address: {address:?}.");
+                }
             }
         }
 

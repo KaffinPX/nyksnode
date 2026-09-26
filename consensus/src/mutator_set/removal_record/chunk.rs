@@ -30,9 +30,7 @@ const LONG_LENGTH_FLAG: u32 = 1 << 11;
 
 #[derive(Debug, Clone, Copy, Error, PartialEq, Eq)]
 pub(crate) enum ChunkUnpackError {
-    #[error(
-        "payload is too large -- packed chunk can never be more than {MAX_PACKED_LENGTH} u32s"
-    )]
+    #[error("payload is too large -- packed chunk can never be more than {MAX_PACKED_LENGTH} u32s")]
     PayloadTooBig,
 
     #[error("actual length is inconsistent relative to length indicator")]
