@@ -1,3 +1,5 @@
+pub mod event;
+
 use std::sync::Arc;
 
 use num_traits::CheckedSub;
@@ -29,9 +31,9 @@ use crate::scanners::chain::ChainScanner;
 use crate::scanners::mempool::MempoolScanner;
 use crate::state::address_book::AddressBook;
 use crate::state::utxos::MonitoredUtxo;
-use crate::state::utxos::UtxoKey;
 use crate::state::utxos::pool::UtxoPool;
 use crate::state::utxos::pool::UtxosSelection;
+pub use event::WalletEvent;
 
 const BATCH_SIZE: usize = 100;
 
@@ -42,43 +44,6 @@ pub enum SyncError {
 
     #[error("scanner advance failed: {0}")]
     Advance(#[from] AdvanceError),
-}
-
-/// Events emitted by the wallet as a result of sync and scan activity.
-#[derive(Debug, Clone)]
-pub enum WalletEvent {
-    /// A new UTXO was discovered and added to the wallet's UTXO pool.
-    UtxoReceived { key: UtxoKey, utxo: MonitoredUtxo },
-
-    /// A previously-tracked UTXO was found to be spent (or otherwise
-    /// invalid) while syncing membership proofs, and was evicted from the
-    /// pool.
-    UtxoInvalidated { key: UtxoKey, utxo: MonitoredUtxo },
-
-    /// A mempool transaction was found to spend one or more of the
-    /// wallet's UTXOs. Emitted once per transaction, the first time it's
-    /// observed as relevant.
-    UtxosOutgoing {
-        id: TransactionKernelId,
-        utxos: Vec<UtxoKey>,
-    },
-
-    /// A new address was derived by the wallet.
-    AddressGenerated { key_type: KeyType, address: Address },
-}
-
-impl WalletEvent {
-    pub fn utxo_received(key: UtxoKey, utxo: MonitoredUtxo) -> Self {
-        WalletEvent::UtxoReceived { key, utxo }
-    }
-
-    pub fn utxo_invalidated(key: UtxoKey, utxo: MonitoredUtxo) -> Self {
-        WalletEvent::UtxoInvalidated { key, utxo }
-    }
-
-    pub fn utxos_outgoing(id: TransactionKernelId, utxos: Vec<UtxoKey>) -> Self {
-        WalletEvent::UtxosOutgoing { id, utxos }
-    }
 }
 
 #[derive(Clone)]
@@ -103,12 +68,12 @@ impl Wallet {
         height: Option<BlockHeight>,
         network: Network,
     ) -> Self {
-        Self::new_with_address_indexes(rpc, entropy, height, network, 1, 1)
+        Self::new_with_indexes(rpc, entropy, height, network, 1, 1)
     }
 
     /// Creates a wallet that scans every index from 0 through the selected
     /// index per key type.
-    pub fn new_with_address_indexes(
+    pub fn new_with_indexes(
         rpc: HttpClient,
         entropy: WalletEntropy,
         height: Option<BlockHeight>,
