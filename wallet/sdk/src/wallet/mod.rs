@@ -54,10 +54,7 @@ pub struct Wallet {
     mempool_scanner: Arc<RwLock<MempoolScanner>>,
     utxos: Arc<RwLock<UtxoPool>>,
     pub network: Network,
-
-    /// Events raised outside of `sync` (e.g. by `send`, when it evicts spent
-    /// UTXOs) that haven't been handed to a caller yet. Drained and merged
-    /// into the next `sync()` call's returned events.
+    /// Events queued for delivery by the next `sync()` call.
     pending_events: Arc<RwLock<Vec<WalletEvent>>>,
 }
 
@@ -68,11 +65,11 @@ impl Wallet {
         height: Option<BlockHeight>,
         network: Network,
     ) -> Self {
-        Self::new_with_indexes(rpc, entropy, height, network, 1, 1)
+        Self::new_with_indexes(rpc, entropy, height, network, 0, 0)
     }
 
-    /// Creates a wallet that scans every index from 0 through the selected
-    /// index per key type.
+    /// Creates a wallet that scans every index through the last used index
+    /// and the current unused address.
     pub fn new_with_indexes(
         rpc: HttpClient,
         entropy: WalletEntropy,
@@ -83,16 +80,18 @@ impl Wallet {
     ) -> Self {
         let addresses =
             AddressBook::with_address_indexes(entropy, generation_index, symmetric_index);
+        let scanner = ChainScanner::new(
+            height,
+            None,
+            addresses.viewing_keys().cloned().collect(),
+            network,
+        );
         let utxos = UtxoPool::new(rpc.clone());
-
-        let view_keys = addresses.viewing_keys().to_vec();
 
         Wallet {
             rpc,
             addresses: Arc::new(RwLock::new(addresses)),
-            scanner: Arc::new(RwLock::new(ChainScanner::new(
-                height, None, view_keys, network,
-            ))),
+            scanner: Arc::new(RwLock::new(scanner)),
             mempool_scanner: Arc::new(RwLock::new(MempoolScanner::new(utxos.index()))),
             utxos: Arc::new(RwLock::new(utxos)),
             network,
@@ -121,15 +120,24 @@ impl Wallet {
     }
 
     pub async fn address(&self, key_type: KeyType) -> Address {
-        self.addresses.read().await.latest(key_type)
+        self.addresses.read().await.latest_address(key_type)
     }
 
     pub async fn next_address(&self, key_type: KeyType) -> Address {
         let mut addresses = self.addresses.write().await;
         let mut scanner = self.scanner.write().await;
 
-        let (address, view_key) = addresses.next_address(key_type);
-        scanner.add_key(view_key);
+        let (address, index, viewing_key) = addresses.next_address(key_type);
+        scanner.add_key(viewing_key);
+
+        self.pending_events
+            .write()
+            .await
+            .push(WalletEvent::AddressGenerated {
+                key_type,
+                index,
+                address: address.clone(),
+            });
 
         address
     }
@@ -355,14 +363,8 @@ impl Wallet {
         selection: UtxosSelection,
     ) -> BuilderTransaction {
         let inputs = self.unlock_utxos(selection.utxos).await;
-        let change_address = self.next_address(KeyType::Symmetric).await;
-        self.pending_events
-            .write()
-            .await
-            .push(WalletEvent::AddressGenerated {
-                key_type: KeyType::Symmetric,
-                address: change_address.clone(),
-            });
+        let change_address = self.address(KeyType::Symmetric).await;
+        self.next_address(KeyType::Symmetric).await;
 
         let (sender_randomness, change_sender_randomness) = {
             let addresses = self.addresses.read().await;

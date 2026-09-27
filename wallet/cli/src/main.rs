@@ -7,6 +7,7 @@ use anyhow::Result;
 use clap::Parser;
 use nyks_consensus::network::Network;
 use nyks_rpc_client::http::HttpClient;
+use nyks_standards::wallet::keys::key::KeyType;
 use nyks_wallet_core::entropy::wallet_entropy::WalletEntropy;
 use nyks_wallet_sdk::wallet::Wallet;
 
@@ -54,7 +55,14 @@ async fn main() -> Result<()> {
         None => setup::run(&storage)?,
     };
 
-    let wallet = Wallet::new(rpc, entropy, storage.chain.get_height(), args.network);
+    let wallet = Wallet::new_with_indexes(
+        rpc,
+        entropy,
+        storage.chain.get_height(),
+        args.network,
+        storage.keys.last_index(KeyType::Generation),
+        storage.keys.last_index(KeyType::Symmetric),
+    );
 
     // Import initial state of wallet.
     wallet.import_utxos(storage.utxos.iter().collect()).await;

@@ -25,7 +25,11 @@ pub enum WalletEvent {
     },
 
     /// A new address was derived by the wallet.
-    AddressGenerated { key_type: KeyType, address: Address },
+    AddressGenerated {
+        key_type: KeyType,
+        index: u64,
+        address: Address,
+    },
 }
 
 impl WalletEvent {

@@ -110,20 +110,19 @@ impl KeysStore {
         write_json(&self.path, data);
     }
 
-    /// Returns the next derivation index (stored index + 1) for display.
-    pub fn next_index(&self, key: KeyType) -> u64 {
+    pub fn last_index(&self, key: KeyType) -> u64 {
         let data = self.read();
         match key {
-            KeyType::Generation => data.generation_index + 1,
-            KeyType::Symmetric => data.symmetric_index + 1,
+            KeyType::Generation => data.generation_index,
+            KeyType::Symmetric => data.symmetric_index,
         }
     }
 
-    pub fn increment(&self, key: KeyType) {
+    pub fn set_index(&self, key: KeyType, index: u64) {
         let mut data = self.read();
         match key {
-            KeyType::Generation => data.generation_index += 1,
-            KeyType::Symmetric => data.symmetric_index += 1,
+            KeyType::Generation => data.generation_index = index,
+            KeyType::Symmetric => data.symmetric_index = index,
         }
         self.write(&data);
     }
