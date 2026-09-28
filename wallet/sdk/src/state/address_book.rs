@@ -6,7 +6,6 @@ use nyks_standards::wallet::keys::key::Key;
 use nyks_standards::wallet::keys::key::KeyType;
 use nyks_standards::wallet::keys::key::Spender;
 use nyks_standards::wallet::keys::viewing_key::ViewingKey;
-
 use nyks_wallet_core::entropy::wallet_entropy::WalletEntropy;
 
 /// Owns the wallet's entropy and derives/tracks its addresses and keys.

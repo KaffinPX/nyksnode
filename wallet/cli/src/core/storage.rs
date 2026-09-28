@@ -86,11 +86,21 @@ impl Storage {
 }
 
 /// Typed on-disk representation for `keys.json`.
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct KeysData {
     generation_index: u64,
     symmetric_index: u64,
     mnemonic: Option<String>,
+}
+
+impl Default for KeysData {
+    fn default() -> Self {
+        Self {
+            generation_index: 1,
+            symmetric_index: 1,
+            mnemonic: None,
+        }
+    }
 }
 
 pub struct KeysStore {
