@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 
 use nyks_standards::wallet::keys::address::Address;
@@ -5,122 +6,108 @@ use nyks_standards::wallet::keys::key::Key;
 use nyks_standards::wallet::keys::key::KeyType;
 use nyks_standards::wallet::keys::key::Spender;
 use nyks_standards::wallet::keys::viewing_key::ViewingKey;
-
 use nyks_wallet_core::entropy::wallet_entropy::WalletEntropy;
 
 /// Owns the wallet's entropy and derives/tracks its addresses and keys.
-///
-/// Addresses are grouped by key type in derivation order - index `i` is
-/// the `i`-th derived key of that type, with index 0 being the special key.
-/// `view_keys` mirrors that same order and stays in sync as addresses are
-/// added.
 #[derive(Debug)]
-pub(crate) struct AddressBook {
+pub struct AddressBook {
     entropy: WalletEntropy,
-    addresses: HashMap<KeyType, Vec<Address>>,
-    view_keys: Vec<ViewingKey>,
+    addresses: HashMap<KeyType, BTreeMap<u64, (Address, ViewingKey)>>,
 }
 
 impl AddressBook {
-    /// Seeds each key type with the special key and index-1 address.
-    pub(crate) fn new(entropy: WalletEntropy) -> Self {
-        let mut addresses: HashMap<KeyType, Vec<Address>> = HashMap::new();
+    /// Tracks every used derivation index, plus the next unused address for
+    /// each key type. Index 0 is reserved for the special key and is included.
+    pub fn with_address_indexes(
+        entropy: WalletEntropy,
+        generation_index: u64,
+        symmetric_index: u64,
+    ) -> Self {
+        let mut addresses = HashMap::new();
 
-        addresses.insert(
-            KeyType::Generation,
-            vec![
-                entropy.special_generation_key().to_address().into(),
-                entropy.nth_generation_address(1).into(),
-            ],
-        );
-        addresses.insert(
-            KeyType::Symmetric,
-            vec![
-                entropy.special_symmetric_key().to_address().into(),
-                entropy.nth_symmetric_address(1).into(),
-            ],
-        );
+        for (key_type, index) in [
+            (KeyType::Generation, generation_index),
+            (KeyType::Symmetric, symmetric_index),
+        ] {
+            let mut by_index = BTreeMap::new();
 
-        let view_keys = vec![
-            entropy.special_generation_key().to_viewing_key().into(),
-            entropy.nth_generation_key(1).to_viewing_key().into(),
-            entropy.special_symmetric_key().to_viewing_key().into(),
-            entropy.nth_symmetric_key(1).to_viewing_key().into(),
-        ];
+            for index in 0..=index + 1 {
+                by_index.insert(index, derive(&entropy, key_type, index));
+            }
 
-        AddressBook {
-            entropy,
-            addresses,
-            view_keys,
+            addresses.insert(key_type, by_index);
         }
+
+        AddressBook { entropy, addresses }
     }
 
-    pub(crate) fn view_keys(&self) -> &[ViewingKey] {
-        &self.view_keys
+    pub fn viewing_keys(&self) -> impl Iterator<Item = &ViewingKey> {
+        self.addresses
+            .values()
+            .flat_map(|by_index| by_index.values().map(|(_, viewing_key)| viewing_key))
     }
 
-    /// Escape hatch for entropy-derived stuff that isn't really about
-    /// addresses (e.g. sender randomness), so this struct doesn't need a
-    /// proxy method per use.
     pub(crate) fn entropy(&self) -> &WalletEntropy {
         &self.entropy
     }
 
-    pub(crate) fn latest(&self, key_type: KeyType) -> Address {
+    /// Returns the highest tracked address, which is the wallet's current
+    /// unused address.
+    pub fn latest_address(&self, key_type: KeyType) -> Address {
         self.addresses
             .get(&key_type)
-            .and_then(|v| v.last())
-            .cloned()
+            .and_then(|by_index| by_index.last_key_value())
+            .map(|(_, (address, _))| address.clone())
             .unwrap()
     }
 
-    /// Derives the next address for a key type, registers it, and returns
-    /// it along with its viewing key.
-    pub(crate) fn next_address(&mut self, key_type: KeyType) -> (Address, ViewingKey) {
-        let next_index = self.next_index(key_type);
-
-        let (address, view_key): (Address, ViewingKey) = match key_type {
-            KeyType::Generation => {
-                let key = self.entropy.nth_generation_key(next_index);
-                (key.to_address().into(), key.to_viewing_key().into())
-            }
-            KeyType::Symmetric => {
-                let key = self.entropy.nth_symmetric_key(next_index);
-                (key.to_address().into(), key.to_viewing_key().into())
-            }
-        };
-
+    /// Derives and records a new address, then returns it with its index and
+    /// viewing key.
+    pub fn next_address(&mut self, key_type: KeyType) -> (Address, u64, ViewingKey) {
+        let index = self.addresses[&key_type]
+            .last_key_value()
+            .map(|(&index, _)| index + 1)
+            .unwrap_or(1);
+        let (address, viewing_key) = derive(&self.entropy, key_type, index);
         self.addresses
             .entry(key_type)
             .or_default()
-            .push(address.clone());
-        self.view_keys.push(view_key.clone());
+            .insert(index, (address.clone(), viewing_key.clone()));
 
-        (address, view_key)
+        (address, index, viewing_key)
     }
 
     /// Derives the spending key for whichever address matches, if any.
-    pub(crate) fn spending_key(&self, matches: impl Fn(&Address) -> bool) -> Option<Key> {
+    pub fn spending_key(&self, matches: impl Fn(&Address) -> bool) -> Option<Key> {
         let (key_type, index) = self.find(matches)?;
 
         Some(match key_type {
-            KeyType::Generation => self.entropy.nth_generation_key(index as u64).into(),
-            KeyType::Symmetric => self.entropy.nth_symmetric_key(index as u64).into(),
+            KeyType::Generation => self.entropy.nth_generation_key(index).into(),
+            KeyType::Symmetric => self.entropy.nth_symmetric_key(index).into(),
         })
     }
 
-    fn next_index(&self, key_type: KeyType) -> u64 {
-        self.addresses.get(&key_type).map(|v| v.len()).unwrap_or(0) as u64
-    }
-
-    fn find(&self, matches: impl Fn(&Address) -> bool) -> Option<(KeyType, usize)> {
+    fn find(&self, matches: impl Fn(&Address) -> bool) -> Option<(KeyType, u64)> {
         for (key_type, addrs) in self.addresses.iter() {
-            for (index, address) in addrs.iter().enumerate() {
-                if matches(address) {
+            for (&index, address) in addrs.iter() {
+                if matches(&address.0) {
                     return Some((*key_type, index));
                 }
             }
         }
         None
+    }
+}
+
+fn derive(entropy: &WalletEntropy, key_type: KeyType, index: u64) -> (Address, ViewingKey) {
+    match key_type {
+        KeyType::Generation => {
+            let key = entropy.nth_generation_key(index);
+            (key.to_address().into(), key.to_viewing_key().into())
+        }
+        KeyType::Symmetric => {
+            let key = entropy.nth_symmetric_key(index);
+            (key.to_address().into(), key.to_viewing_key().into())
+        }
     }
 }
