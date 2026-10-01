@@ -176,9 +176,9 @@ mod tests {
     use std::hint::black_box;
 
     use proptest_arbitrary_interop::arb;
-    use rand::RngExt;
-use rand::rng;
+    use rand::rng;
     use rand::Rng;
+    use rand::RngExt;
     use test_strategy::proptest;
 
     use super::*;
