@@ -43,6 +43,17 @@ pub(crate) fn deterministically_derive_seed_and_nonce(
 
             (seed, e4)
         }
+        NoteContent::Message(m) => {
+            let combined = Tip5::hash_pair(m.sender_randomness, Tip5::hash(&m.message));
+            let [e0, e1, e2, e3, e4] = combined.values();
+            let e0: [u8; 8] = e0.into();
+            let e1: [u8; 8] = e1.into();
+            let e2: [u8; 8] = e2.into();
+            let e3: [u8; 8] = e3.into();
+            let seed = [e0, e1, e2, e3].concat().try_into().unwrap();
+
+            (seed, e4)
+        }
     }
 }
 

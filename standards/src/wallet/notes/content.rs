@@ -41,9 +41,28 @@ impl UtxoContent {
     }
 }
 
+/// Text message payload.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, BFieldCodec)]
+pub struct MessageContent {
+    pub message: Vec<u8>,
+    pub sender_randomness: Digest,
+}
+
+impl MessageContent {
+    pub const DISCRIMINANT: u64 = 1;
+
+    pub fn new(message: impl Into<String>, sender_randomness: Digest) -> Self {
+        Self {
+            message: message.into().into_bytes(),
+            sender_randomness,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NoteContent {
     Utxo(UtxoContent),
+    Message(MessageContent),
 }
 
 impl NoteContent {
@@ -51,6 +70,7 @@ impl NoteContent {
     pub fn discriminant(&self) -> u64 {
         match self {
             Self::Utxo(_) => UtxoContent::DISCRIMINANT,
+            Self::Message(_) => MessageContent::DISCRIMINANT,
         }
     }
 }
@@ -61,12 +81,19 @@ impl From<UtxoContent> for NoteContent {
     }
 }
 
+impl From<MessageContent> for NoteContent {
+    fn from(message: MessageContent) -> Self {
+        Self::Message(message)
+    }
+}
+
 impl BFieldCodec for NoteContent {
     type Error = NoteContentError;
 
     fn encode(&self) -> Vec<BFieldElement> {
         let (discriminant, mut payload) = match self {
             Self::Utxo(u) => (UtxoContent::DISCRIMINANT, u.encode()),
+            Self::Message(message) => (MessageContent::DISCRIMINANT, message.encode()),
         };
 
         let mut out = Vec::with_capacity(1 + payload.len());
@@ -86,6 +113,11 @@ impl BFieldCodec for NoteContent {
                 let content =
                     UtxoContent::decode(rest).map_err(|e| NoteContentError::Decode(e.into()))?;
                 Ok(Box::new(Self::Utxo(*content)))
+            }
+            d if d == MessageContent::DISCRIMINANT => {
+                let message =
+                    MessageContent::decode(rest).map_err(|e| NoteContentError::Decode(e.into()))?;
+                Ok(Box::new(Self::Message(*message)))
             }
             _ => Err(NoteContentError::UnknownDiscriminant(discriminant)),
         }
@@ -138,5 +170,17 @@ mod tests {
         let err =
             NoteContent::decode(&[BFieldElement::new(UtxoContent::DISCRIMINANT)]).unwrap_err();
         assert!(matches!(err, NoteContentError::Decode(_)));
+    }
+
+    #[test]
+    fn message_content_round_trips_through_note_content() {
+        let message = MessageContent::new("Hello, Nyks!", Digest::default());
+        let content: NoteContent = message.clone().into();
+
+        assert_eq!(content.discriminant(), MessageContent::DISCRIMINANT);
+        assert_eq!(content, NoteContent::Message(message));
+        let encoded = content.encode();
+        assert_eq!(encoded[0], BFieldElement::new(MessageContent::DISCRIMINANT));
+        assert_eq!(*NoteContent::decode(&encoded).unwrap(), content);
     }
 }
