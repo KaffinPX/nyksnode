@@ -40,7 +40,7 @@ pub struct Args {
     pub guesser_fee_fraction: f64,
 
     /// Graffiti message to publish in the block announcement.
-    #[arg(long)]
+    #[arg(long, default_value = "nyks-composer")]
     pub graffiti: Option<String>,
 }
 
@@ -136,7 +136,8 @@ impl Args {
 
     pub(crate) fn announcement(&self) -> Option<Announcement> {
         self.graffiti.as_ref().map(|message| {
-            let content = MessageContent::new(message.clone(), Digest::default());
+            let message = format!("{message} {}", env!("CARGO_PKG_VERSION"));
+            let content = MessageContent::new(message, Digest::default());
             let public_note = PublicNote::new(BFieldElement::new(0), content.into());
 
             Announcement::from(&Note::from(public_note))
