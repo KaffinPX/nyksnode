@@ -156,6 +156,22 @@ mod tests {
     }
 
     #[test]
+    fn message_content_round_trips_through_note_content() {
+        let message = MessageContent::new("Hello, Nyks!", Digest::default());
+        let content: NoteContent = message.clone().into();
+
+        assert_eq!(content.discriminant(), MessageContent::DISCRIMINANT);
+        assert_eq!(content, NoteContent::Message(message));
+
+        // Encoding prefixes the message payload with the message discriminant.
+        let encoded = content.encode();
+        assert_eq!(encoded[0], BFieldElement::new(MessageContent::DISCRIMINANT));
+
+        // Decoding the encoded content reconstructs the original value.
+        assert_eq!(*NoteContent::decode(&encoded).unwrap(), content);
+    }
+
+    #[test]
     fn decode_rejects_invalid_sequences() {
         // Empty sequence: no discriminant element at all.
         let err = NoteContent::decode(&[]).unwrap_err();
@@ -170,17 +186,5 @@ mod tests {
         let err =
             NoteContent::decode(&[BFieldElement::new(UtxoContent::DISCRIMINANT)]).unwrap_err();
         assert!(matches!(err, NoteContentError::Decode(_)));
-    }
-
-    #[test]
-    fn message_content_round_trips_through_note_content() {
-        let message = MessageContent::new("Hello, Nyks!", Digest::default());
-        let content: NoteContent = message.clone().into();
-
-        assert_eq!(content.discriminant(), MessageContent::DISCRIMINANT);
-        assert_eq!(content, NoteContent::Message(message));
-        let encoded = content.encode();
-        assert_eq!(encoded[0], BFieldElement::new(MessageContent::DISCRIMINANT));
-        assert_eq!(*NoteContent::decode(&encoded).unwrap(), content);
     }
 }
