@@ -50,11 +50,12 @@ pub struct MessageContent {
 impl MessageContent {
     pub const DISCRIMINANT: u64 = 1;
 
-    /// Add an 8-byte random suffix for seed and nonce derivation.
-    /// The suffix is part of the message.
+    /// Also adds an 8-byte random suffix, separated from the message by a space.
     pub fn new(message: impl Into<String>) -> Self {
         let mut message = message.into().into_bytes();
+        message.push(b' ');
         message.extend_from_slice(&rand::random::<u64>().to_be_bytes());
+
         Self { message }
     }
 
