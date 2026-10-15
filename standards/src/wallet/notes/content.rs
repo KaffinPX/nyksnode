@@ -45,16 +45,25 @@ impl UtxoContent {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, BFieldCodec)]
 pub struct MessageContent {
     pub message: Vec<u8>,
-    pub sender_randomness: Digest,
 }
 
 impl MessageContent {
     pub const DISCRIMINANT: u64 = 1;
 
-    pub fn new(message: impl Into<String>, sender_randomness: Digest) -> Self {
+    /// Add an 8-byte random suffix for seed and nonce derivation.
+    /// The suffix is part of the message.
+    pub fn new(message: impl Into<String>) -> Self {
+        let mut message = message.into().into_bytes();
+        message.extend_from_slice(&rand::random::<u64>().to_be_bytes());
+        Self { message }
+    }
+
+    /// Create message content without a random suffix.
+    /// Encrypting identical content under the same key reuses its nonce. Use only
+    /// for unencrypted content or when nonce uniqueness is handled elsewhere.
+    pub fn without_random_suffix(message: impl Into<String>) -> Self {
         Self {
             message: message.into().into_bytes(),
-            sender_randomness,
         }
     }
 }
@@ -157,7 +166,7 @@ mod tests {
 
     #[test]
     fn message_content_round_trips_through_note_content() {
-        let message = MessageContent::new("Hello, Nyks!", Digest::default());
+        let message = MessageContent::new("Hello, Nyks!");
         let content: NoteContent = message.clone().into();
 
         assert_eq!(content.discriminant(), MessageContent::DISCRIMINANT);

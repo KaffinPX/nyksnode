@@ -137,7 +137,7 @@ impl Args {
     pub(crate) fn announcement(&self) -> Option<Announcement> {
         self.graffiti.as_ref().map(|message| {
             let message = format!("{message} {}", env!("CARGO_PKG_VERSION"));
-            let content = MessageContent::new(message, Digest::default());
+            let content = MessageContent::without_random_suffix(message);
             let public_note = PublicNote::new(BFieldElement::new(0), content.into());
 
             Announcement::from(&Note::from(public_note))
